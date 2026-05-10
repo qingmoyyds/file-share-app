@@ -1,0 +1,14 @@
+{
+  "envId": "ceshishiyong-d1gb3vg9y56ee3be6",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "api",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 15,
+      "installDependency": true,
+      "path": "/api"
+    }
+  ]
+}
