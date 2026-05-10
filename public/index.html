@@ -229,13 +229,36 @@ function switchTab(key) {
 
 function contactQQ() {
   const qq = DATA.qq || '2942029576';
+  // Copy to clipboard
   if (navigator.clipboard) {
     navigator.clipboard.writeText(qq).then(() => {
-      if (confirm('✅ QQ号 [' + qq + '] 已复制！\n\n点击【确定】尝试直接打开 QQ。')) {
-        location.href = 'tencent://message/?uin=' + qq;
-      }
-    }).catch(() => prompt('请手动复制 QQ 号：', qq));
-  } else { prompt('请手动复制 QQ 号：', qq); }
+      showQQModal(qq);
+    }).catch(() => showQQModal(qq));
+  } else {
+    showQQModal(qq);
+  }
+}
+
+function showQQModal(qq) {
+  // Remove existing modal
+  const old = document.getElementById('qq-modal');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'qq-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease;';
+  overlay.innerHTML = `
+    <div style="background:#1e1e20;border:1px solid #333;border-radius:16px;padding:36px;text-align:center;max-width:360px;width:90%;animation:modalIn .3s ease;">
+      <div style="font-size:48px;margin-bottom:16px;">🐧</div>
+      <h3 style="color:#fff;margin-bottom:8px;">添加 QQ 好友</h3>
+      <p style="color:#888;font-size:13px;margin-bottom:20px;">QQ号已复制到剪贴板<br>请在 QQ 中搜索该号码添加好友</p>
+      <div style="background:rgba(255,255,255,.04);border:1px solid #333;border-radius:10px;padding:16px;margin-bottom:20px;">
+        <span style="font-size:28px;font-weight:900;color:#3ea6ff;letter-spacing:2px;">${qq}</span>
+      </div>
+      <button onclick="document.getElementById('qq-modal').remove()" style="width:100%;padding:14px;border-radius:30px;background:#3ea6ff;color:#fff;font-weight:700;font-size:16px;border:none;cursor:pointer;">知道了</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
 function downloadScript(url, pwd) {
