@@ -3,6 +3,7 @@ const multer = require('multer');
 const session = require('express-session');
 const serverless = require('serverless-http');
 const cloudbase = require('@cloudbase/node-sdk');
+const crypto = require('crypto');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -10,11 +11,21 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const tcb = cloudbase.init({});
 const db = tcb.database();
 const FILES_COLLECTION = 'files';
+const USERS_COLLECTION = 'users';
 
-const USERS = {
-  admin: { password: 'admin123', role: 'admin' },
-  user:  { password: 'user123',  role: 'user' }
-};
+// Seed default users on first deploy
+let seedPromise = (async () => {
+  try {
+    const { data } = await db.collection(USERS_COLLECTION).limit(1).get();
+    if (!data || data.length === 0) {
+      await db.collection(USERS_COLLECTION).add({ username: 'admin', password: 'admin123', role: 'admin' });
+      await db.collection(USERS_COLLECTION).add({ username: 'user', password: 'user123', role: 'user' });
+      console.log('Default users seeded');
+    }
+  } catch (e) {
+    console.error('Seed error:', e.message);
+  }
+})();
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
@@ -27,6 +38,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -45,12 +57,18 @@ app.use(session({
 }));
 
 // --- Auth ---
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = USERS[username];
-  if (!user || user.password !== password) return res.status(401).json({ error: '用户名或密码错误' });
-  req.session.user = { username, role: user.role };
-  res.json({ ok: true, role: user.role, username });
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const { data } = await db.collection(USERS_COLLECTION).where({ username }).limit(1).get();
+    if (!data || data.length === 0 || data[0].password !== password) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+    req.session.user = { username, role: data[0].role };
+    res.json({ ok: true, role: data[0].role, username });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/logout', (req, res) => {
@@ -63,6 +81,86 @@ app.get('/api/session', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// --- User Management (Admin Only) ---
+
+// List users
+app.get('/api/users', requireAdmin, async (req, res) => {
+  try {
+    const { data } = await db.collection(USERS_COLLECTION).orderBy('username', 'asc').get();
+    // Don't expose passwords
+    const users = (data || []).map(u => ({ username: u.username, role: u.role, _id: u._id }));
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create user
+app.post('/api/users', requireAdmin, async (req, res) => {
+  try {
+    const { username, password, role } = req.body;
+    if (!username || !password) return res.status(400).json({ error: '用户名和密码不能为空' });
+    if (!/^[a-zA-Z0-9_]{2,20}$/.test(username)) return res.status(400).json({ error: '用户名需 2-20 位，仅限字母数字下划线' });
+    if (password.length < 3) return res.status(400).json({ error: '密码至少 3 位' });
+
+    const { data: existing } = await db.collection(USERS_COLLECTION).where({ username }).limit(1).get();
+    if (existing && existing.length > 0) return res.status(409).json({ error: '用户名已存在' });
+
+    await db.collection(USERS_COLLECTION).add({ username, password, role: role || 'user' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete user
+app.delete('/api/users/:username', requireAdmin, async (req, res) => {
+  try {
+    if (req.params.username === req.session.user.username) {
+      return res.status(400).json({ error: '不能删除自己' });
+    }
+    const { data } = await db.collection(USERS_COLLECTION).where({ username: req.params.username }).limit(1).get();
+    if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).remove();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset password
+app.put('/api/users/:username/password', requireAdmin, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 3) return res.status(400).json({ error: '密码至少 3 位' });
+
+    const { data } = await db.collection(USERS_COLLECTION).where({ username: req.params.username }).limit(1).get();
+    if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
+
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Change own password (any authenticated user)
+app.put('/api/password', requireAuth, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 3) return res.status(400).json({ error: '新密码至少 3 位' });
+
+    const { data } = await db.collection(USERS_COLLECTION).where({ username: req.session.user.username }).limit(1).get();
+    if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
+    if (data[0].password !== oldPassword) return res.status(403).json({ error: '原密码错误' });
+
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: newPassword });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // --- Files ---
 app.get('/api/files', requireAuth, async (req, res) => {
@@ -81,14 +179,7 @@ app.post('/api/files', requireAdmin, upload.single('file'), async (req, res) => 
   if (!req.file) return res.status(400).json({ error: '未选择文件' });
   try {
     const safeName = `${Date.now()}-${encodeURIComponent(req.file.originalname)}`;
-
-    // Upload to cloud storage
-    const uploadResult = await tcb.uploadFile({
-      cloudPath: safeName,
-      fileContent: req.file.buffer
-    });
-
-    // Save metadata to database
+    const uploadResult = await tcb.uploadFile({ cloudPath: safeName, fileContent: req.file.buffer });
     await db.collection(FILES_COLLECTION).add({
       name: safeName,
       fileId: uploadResult.fileID,
@@ -96,7 +187,6 @@ app.post('/api/files', requireAdmin, upload.single('file'), async (req, res) => 
       size: req.file.size,
       uploadedAt: new Date().toISOString()
     });
-
     res.json({ ok: true, name: safeName, originalName: req.file.originalname });
   } catch (err) {
     res.status(500).json({ error: '上传失败: ' + err.message });
@@ -105,11 +195,8 @@ app.post('/api/files', requireAdmin, upload.single('file'), async (req, res) => 
 
 app.get('/api/files/:name', requireAuth, async (req, res) => {
   try {
-    // Look up fileId from database by name
     const docs = await db.collection(FILES_COLLECTION).where({ name: req.params.name }).get();
-    if (!docs.data || docs.data.length === 0) {
-      return res.status(404).json({ error: '文件不存在' });
-    }
+    if (!docs.data || docs.data.length === 0) return res.status(404).json({ error: '文件不存在' });
     const fileRecord = docs.data[0];
     const fileId = fileRecord.fileId || req.params.name;
     const result = await tcb.downloadFile({ fileID: fileId });
@@ -124,7 +211,6 @@ app.get('/api/files/:name', requireAuth, async (req, res) => {
 
 app.delete('/api/files/:name', requireAdmin, async (req, res) => {
   try {
-    // Look up fileId from database
     const docs = await db.collection(FILES_COLLECTION).where({ name: req.params.name }).get();
     let fileId = req.params.name;
     if (docs.data && docs.data.length > 0) {

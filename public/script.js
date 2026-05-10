@@ -27,6 +27,19 @@ const dropZone = $('dropZone');
 const skeletonLoading = $('skeletonLoading');
 const statsBar = $('statsBar');
 const searchInput = $('searchInput');
+// Admin tabs & user management
+const adminTabs = $('adminTabs');
+const filesPanel = $('filesPanel');
+const usersPanel = $('usersPanel');
+const addUserForm = $('addUserForm');
+const addUserError = $('addUserError');
+const userTableBody = $('userTableBody');
+const pwModal = $('pwModal');
+const pwModalUser = $('pwModalUser');
+const pwModalClose = $('pwModalClose');
+const pwResetForm = $('pwResetForm');
+const resetPwError = $('resetPwError');
+let resetTargetUser = null;
 
 // --- Init ---
 checkSession();
@@ -97,6 +110,8 @@ function showMain(username, role) {
 
   if (role === 'admin') {
     uploadSection.style.display = 'block';
+    adminTabs.style.display = 'flex';
+    loadUsers();
   }
 
   loadFiles();
@@ -110,6 +125,11 @@ $('logoutBtn').addEventListener('click', async () => {
   loginPage.classList.add('active');
   uploadSection.style.display = 'none';
   statsBar.style.display = 'none';
+  adminTabs.style.display = 'none';
+  filesPanel.classList.add('active');
+  usersPanel.classList.remove('active');
+  adminTabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  adminTabs.querySelector('[data-tab="files"]').classList.add('active');
 });
 
 // --- File Input ---
@@ -339,6 +359,125 @@ $('refreshBtn').addEventListener('click', () => {
   searchInput.value = '';
   loadFiles();
 });
+
+// --- Tab Switching ---
+adminTabs.addEventListener('click', (e) => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  const target = tab.dataset.tab;
+  adminTabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  filesPanel.classList.toggle('active', target === 'files');
+  usersPanel.classList.toggle('active', target === 'users');
+});
+
+// --- User Management ---
+addUserForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  addUserError.textContent = '';
+  const username = $('newUsername').value.trim();
+  const password = $('newPassword').value;
+  const role = $('newUserRole').value;
+  if (!username || !password) { addUserError.textContent = '请填写完整'; return; }
+
+  try {
+    const res = await fetch(api('/api/users'), {
+      ...creds, method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, role })
+    });
+    const data = await res.json();
+    if (!res.ok) { addUserError.textContent = data.error; return; }
+    toast(`用户 ${username} 创建成功`, 'success');
+    $('newUsername').value = '';
+    $('newPassword').value = '';
+    $('newUserRole').value = 'user';
+    loadUsers();
+  } catch { addUserError.textContent = '网络错误'; }
+});
+
+async function loadUsers() {
+  try {
+    const res = await fetch(api('/api/users'), creds);
+    if (!res.ok) throw new Error();
+    const users = await res.json();
+    if (users.length === 0) {
+      userTableBody.innerHTML = '<tr><td colspan="3" class="empty-msg">暂无用户</td></tr>';
+      return;
+    }
+    userTableBody.innerHTML = users.map(u => `
+      <tr>
+        <td><strong>${esc(u.username)}</strong></td>
+        <td><span class="role-badge ${u.role}">${u.role === 'admin' ? '管理员' : '用户'}</span></td>
+        <td class="user-actions">
+          <button class="btn-sm btn-outline" data-action="resetpw" data-username="${esc(u.username)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            改密
+          </button>
+          <button class="btn-sm btn-delete" data-action="deleteuser" data-username="${esc(u.username)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+            删除
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    // Event delegation
+    userTableBody.querySelectorAll('[data-action="resetpw"]').forEach(btn => {
+      btn.addEventListener('click', () => openPwModal(btn.dataset.username));
+    });
+    userTableBody.querySelectorAll('[data-action="deleteuser"]').forEach(btn => {
+      btn.addEventListener('click', () => deleteUser(btn.dataset.username));
+    });
+  } catch {
+    userTableBody.innerHTML = '<tr><td colspan="3" class="empty-msg">加载失败</td></tr>';
+  }
+}
+
+async function deleteUser(username) {
+  if (!confirm(`确定要删除用户「${username}」吗？此操作不可撤销。`)) return;
+  try {
+    const res = await fetch(api(`/api/users/${encodeURIComponent(username)}`), { ...creds, method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error, 'error'); return; }
+    toast(`用户 ${username} 已删除`, 'success');
+    loadUsers();
+  } catch { toast('删除失败', 'error'); }
+}
+
+// Password Reset Modal
+function openPwModal(username) {
+  resetTargetUser = username;
+  pwModalUser.textContent = username;
+  $('resetPassword').value = '';
+  resetPwError.textContent = '';
+  pwModal.style.display = 'flex';
+}
+
+pwModalClose.addEventListener('click', () => { pwModal.style.display = 'none'; resetTargetUser = null; });
+pwModal.addEventListener('click', (e) => { if (e.target === pwModal) { pwModal.style.display = 'none'; resetTargetUser = null; } });
+
+pwResetForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  resetPwError.textContent = '';
+  const password = $('resetPassword').value;
+  if (!password || password.length < 3) { resetPwError.textContent = '密码至少 3 位'; return; }
+
+  try {
+    const res = await fetch(api(`/api/users/${encodeURIComponent(resetTargetUser)}/password`), {
+      ...creds, method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (!res.ok) { resetPwError.textContent = data.error; return; }
+    toast(`${resetTargetUser} 的密码已修改`, 'success');
+    pwModal.style.display = 'none';
+    resetTargetUser = null;
+  } catch { resetPwError.textContent = '网络错误'; }
+});
+
+$('refreshUsersBtn').addEventListener('click', loadUsers);
 
 // --- Helpers ---
 function esc(str) {

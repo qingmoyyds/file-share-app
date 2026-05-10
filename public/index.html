@@ -76,6 +76,12 @@
     </header>
 
     <div class="container">
+      <!-- Admin Tabs -->
+      <nav class="tabs" id="adminTabs" style="display:none">
+        <button class="tab active" data-tab="files">文件管理</button>
+        <button class="tab" data-tab="users">用户管理</button>
+      </nav>
+
       <!-- Stats Bar -->
       <div class="stats-bar" id="statsBar" style="display:none">
         <div class="stat-card">
@@ -98,61 +104,134 @@
         </div>
       </div>
 
-      <!-- Upload Section (Admin Only) -->
-      <div id="uploadSection" class="card upload-card" style="display:none">
-        <div class="card-header">
-          <h2>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-            上传文件
-          </h2>
-        </div>
-        <form id="uploadForm">
-          <div class="upload-area" id="dropZone">
-            <div class="upload-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4M5 11l7-7 7 7"/><path d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg>
-            </div>
-            <p class="upload-text">拖拽文件到此处<span class="upload-divider">|</span>点击选择文件</p>
-            <p class="upload-hint">支持单个或批量上传，单文件最大 500MB</p>
-            <input type="file" id="fileInput" multiple>
-          </div>
-          <div class="file-name" id="fileName"></div>
-          <div class="upload-actions">
-            <button type="submit" id="uploadBtn" disabled>
+      <!-- File Management Panel -->
+      <div id="filesPanel" class="tab-panel active">
+        <!-- Upload Section (Admin Only) -->
+        <div id="uploadSection" class="card upload-card" style="display:none">
+          <div class="card-header">
+            <h2>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-              开始上传
-            </button>
+              上传文件
+            </h2>
           </div>
-          <progress id="uploadProgress" value="0" max="100" style="display:none"></progress>
-          <p class="error-msg" id="uploadError"></p>
-        </form>
+          <form id="uploadForm">
+            <div class="upload-area" id="dropZone">
+              <div class="upload-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4M5 11l7-7 7 7"/><path d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg>
+              </div>
+              <p class="upload-text">拖拽文件到此处<span class="upload-divider">|</span>点击选择文件</p>
+              <p class="upload-hint">支持单个或批量上传，单文件最大 500MB</p>
+              <input type="file" id="fileInput" multiple>
+            </div>
+            <div class="file-name" id="fileName"></div>
+            <div class="upload-actions">
+              <button type="submit" id="uploadBtn" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                开始上传
+              </button>
+            </div>
+            <progress id="uploadProgress" value="0" max="100" style="display:none"></progress>
+            <p class="error-msg" id="uploadError"></p>
+          </form>
+        </div>
+
+        <!-- File List -->
+        <div class="card file-list-card">
+          <div class="card-header">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+              文件列表
+            </h2>
+            <div class="header-actions">
+              <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                <input type="text" id="searchInput" placeholder="搜索文件...">
+              </div>
+              <button id="refreshBtn" class="btn-icon" title="刷新列表">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="fileList" class="file-list">
+            <div class="skeleton-list" id="skeletonLoading">
+              <div class="skeleton-item"><div class="skeleton-line w60"></div><div class="skeleton-line w30"></div></div>
+              <div class="skeleton-item"><div class="skeleton-line w70"></div><div class="skeleton-line w25"></div></div>
+              <div class="skeleton-item"><div class="skeleton-line w50"></div><div class="skeleton-line w35"></div></div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- File List -->
-      <div class="card file-list-card">
-        <div class="card-header">
-          <h2>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-            文件列表
-          </h2>
-          <div class="header-actions">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-              <input type="text" id="searchInput" placeholder="搜索文件...">
+      <!-- User Management Panel -->
+      <div id="usersPanel" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+              添加用户
+            </h2>
+          </div>
+          <form id="addUserForm">
+            <div class="user-form-grid">
+              <input type="text" id="newUsername" placeholder="用户名" required>
+              <input type="password" id="newPassword" placeholder="密码" required>
+              <select id="newUserRole">
+                <option value="user">普通用户</option>
+                <option value="admin">管理员</option>
+              </select>
+              <button type="submit" class="btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2M12 3a4 4 0 100 8 4 4 0 000-8z"/><path d="M16 11l2 2 4-4"/></svg>
+                添加用户
+              </button>
             </div>
-            <button id="refreshBtn" class="btn-icon" title="刷新列表">
+            <p class="error-msg" id="addUserError"></p>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 12H8M12 8v8"/></svg>
+              用户列表
+            </h2>
+            <button id="refreshUsersBtn" class="btn-icon" title="刷新">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
             </button>
           </div>
-        </div>
-        <div id="fileList" class="file-list">
-          <!-- Skeleton loading -->
-          <div class="skeleton-list" id="skeletonLoading">
-            <div class="skeleton-item"><div class="skeleton-line w60"></div><div class="skeleton-line w30"></div></div>
-            <div class="skeleton-item"><div class="skeleton-line w70"></div><div class="skeleton-line w25"></div></div>
-            <div class="skeleton-item"><div class="skeleton-line w50"></div><div class="skeleton-line w35"></div></div>
+          <div class="table-wrap">
+            <table class="user-table">
+              <thead>
+                <tr>
+                  <th>用户名</th>
+                  <th>角色</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="userTableBody">
+                <tr><td colspan="3" class="empty-msg">加载中...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Password Reset Modal -->
+  <div id="pwModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>修改密码 — <span id="pwModalUser"></span></h3>
+        <button id="pwModalClose" class="btn-icon">&times;</button>
+      </div>
+      <form id="pwResetForm">
+        <div class="form-group">
+          <label>新密码</label>
+          <input type="password" id="resetPassword" placeholder="至少 3 位" required minlength="3">
+        </div>
+        <button type="submit" class="btn-primary">确认修改</button>
+        <p class="error-msg" id="resetPwError"></p>
+      </form>
     </div>
   </div>
 
