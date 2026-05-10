@@ -251,11 +251,16 @@ function collectData() {
 
 async function saveAll() {
   collectData();
+  // Clean internal fields before sending
+  const payload = { ...content };
+  delete payload._id;
+  delete payload.key;
   try {
-    const r = await fetch(API+'/api/content', { ...creds, method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(content) });
-    if (!r.ok) throw new Error();
-    toast('✅ 保存成功！刷新前台页面即可看到更新');
-  } catch(e) { toast('保存失败', 'err'); }
+    const r = await fetch(API+'/api/content', { ...creds, method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const d = await r.json();
+    if (!r.ok) { toast('保存失败: ' + (d.error || r.status), 'err'); return; }
+    toast('✅ 保存成功！前台已更新');
+  } catch(e) { toast('保存失败: 网络错误', 'err'); }
 }
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }

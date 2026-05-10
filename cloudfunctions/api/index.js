@@ -241,11 +241,16 @@ app.get('/api/content', async (req, res) => {
 
 app.put('/api/content', requireAdmin, async (req, res) => {
   try {
+    // Clean: remove _id and key to avoid DB errors
+    const payload = { ...req.body };
+    delete payload._id;
+    delete payload.key;
+
     const { data } = await db.collection(CONTENT_COLLECTION).where({ key: 'site' }).limit(1).get();
     if (data && data.length > 0) {
-      await db.collection(CONTENT_COLLECTION).doc(data[0]._id).update(req.body);
+      await db.collection(CONTENT_COLLECTION).doc(data[0]._id).update(payload);
     } else {
-      await db.collection(CONTENT_COLLECTION).add({ key: 'site', ...req.body });
+      await db.collection(CONTENT_COLLECTION).add({ key: 'site', ...payload });
     }
     res.json({ ok: true });
   } catch (err) {
