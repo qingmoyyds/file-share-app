@@ -213,7 +213,7 @@ async function loadFiles() {
     allFiles = await res.json();
 
     skeletonLoading.style.display = 'none';
-    updateStats(allFiles);
+    if (currentRole === 'admin') updateStats(allFiles);
     renderFiles(allFiles);
   } catch {
     skeletonLoading.style.display = 'none';
