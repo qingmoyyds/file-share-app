@@ -226,7 +226,7 @@ async function loadFiles() {
 }
 
 function updateStats(files) {
-  statsBar.style.display = 'grid';
+  statsBar.style.display = 'flex';
   $('statFileCount').textContent = files.length;
   const total = files.reduce((s, f) => s + f.size, 0);
   $('statTotalSize').textContent = formatSize(total);
@@ -403,7 +403,7 @@ async function loadUsers() {
     if (!res.ok) throw new Error();
     const users = await res.json();
     if (users.length === 0) {
-      userTableBody.innerHTML = '<tr><td colspan="3" class="empty-msg">暂无用户</td></tr>';
+      userTableBody.innerHTML = '<tr><td colspan="3" class="empty-cell">暂无用户</td></tr>';
       return;
     }
     userTableBody.innerHTML = users.map(u => `
@@ -431,7 +431,7 @@ async function loadUsers() {
       btn.addEventListener('click', () => deleteUser(btn.dataset.username));
     });
   } catch {
-    userTableBody.innerHTML = '<tr><td colspan="3" class="empty-msg">加载失败</td></tr>';
+    userTableBody.innerHTML = '<tr><td colspan="3" class="empty-cell">加载失败</td></tr>';
   }
 }
 
