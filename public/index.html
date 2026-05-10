@@ -182,11 +182,8 @@ function switchTab(key) {
 
   // Video
   const vc = document.getElementById('main-screen');
-  if (prod.bvid) {
-    vc.innerHTML = `<iframe src="//player.bilibili.com/player.html?bvid=${prod.bvid}&page=1&high_quality=1&danmaku=0&autoplay=0" scrolling="no" allowfullscreen="true" sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"></iframe>`;
-  } else {
-    vc.innerHTML = '<div class="empty-state" style="padding:50px"><span style="font-size:40px">🚧</span><br><br><span style="color:#666">该功能正在紧张开发测试中...</span></div>';
-  }
+  const bvid = prod.bvid || DATA.defaultBvid || 'BV18J4m1h7gN';
+  vc.innerHTML = `<iframe src="//player.bilibili.com/player.html?bvid=${bvid}&page=1&high_quality=1&danmaku=0&autoplay=0" scrolling="no" allowfullscreen="true" sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"></iframe>`;
 
   // Cards
   const grid = document.getElementById('card-grid');

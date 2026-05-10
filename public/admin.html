@@ -89,6 +89,7 @@ table td { padding:8px 14px; font-size:13px; border-bottom:1px solid rgba(255,25
       <div class="form-group"><label>QQ号</label><input id="qq" placeholder="QQ号"></div>
       <div class="form-group"><label>B站链接</label><input id="bilibili" placeholder="https://space.bilibili.com/..."></div>
       <div class="form-group"><label>QQ群链接</label><input id="groupLink" placeholder="QQ群链接"></div>
+      <div class="form-group"><label>默认视频BV号</label><input id="defaultBvid" placeholder="当产品未设置BV号时使用"></div>
       <div class="form-group"><label>公告文字</label><input id="notice" placeholder="导航栏公告"></div>
     </div>
   </div>
@@ -152,6 +153,7 @@ function renderAll() {
   document.getElementById('bilibili').value = content.bilibili || '';
   document.getElementById('groupLink').value = content.groupLink || '';
   document.getElementById('notice').value = content.notice || '';
+  document.getElementById('defaultBvid').value = content.defaultBvid || '';
 
   // Products
   const prodKeys = ['merge','match3','rts'];
@@ -223,6 +225,7 @@ function collectData() {
   content.bilibili = document.getElementById('bilibili').value;
   content.groupLink = document.getElementById('groupLink').value;
   content.notice = document.getElementById('notice').value;
+  content.defaultBvid = document.getElementById('defaultBvid').value;
 
   // Products
   for (const k of ['merge','match3','rts']) {
