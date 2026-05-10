@@ -369,6 +369,7 @@ adminTabs.addEventListener('click', (e) => {
   tab.classList.add('active');
   filesPanel.classList.toggle('active', target === 'files');
   usersPanel.classList.toggle('active', target === 'users');
+  if (target === 'users') loadUsers();
 });
 
 // --- User Management ---
