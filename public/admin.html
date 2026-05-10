@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>后台管理 - AE买量脚本</title>
+<style>
+:root { --bg:#0f0f11; --card:#1e1e20; --accent:#3ea6ff; --text:#f0f0f0; --sub:#888; --border:#333; --danger:#ef4444; --success:#4cd964; --radius:10px; }
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+
+.nav { width:100%; padding:14px 24px; border-bottom:1px solid var(--border); background:rgba(15,15,17,.95); backdrop-filter:blur(10px); position:sticky; top:0; z-index:100; display:flex; align-items:center; justify-content:space-between; }
+.nav .brand { font-size:20px; font-weight:900; } .nav .brand span { color:var(--accent); }
+.nav-right { display:flex; align-items:center; gap:12px; }
+.nav-right button { padding:7px 16px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; border:none; background:rgba(255,255,255,.06); color:#999; }
+.nav-right button:hover { background:rgba(255,255,255,.12); color:#ccc; }
+
+.container { max-width:900px; width:94%; margin:28px auto; flex:1; }
+
+/* Login */
+.login-box { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:40px; max-width:400px; margin:60px auto; text-align:center; }
+.login-box h2 { margin-bottom:24px; }
+.login-box input { width:100%; padding:13px 16px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:15px; margin-bottom:16px; }
+.login-box input:focus { outline:none; border-color:var(--accent); }
+.login-box button { width:100%; padding:13px; border-radius:30px; background:var(--accent); color:#fff; font-weight:700; font-size:16px; border:none; cursor:pointer; }
+
+/* Sections */
+.section { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:18px; }
+.section h3 { font-size:15px; color:var(--accent); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.section h4 { font-size:13px; color:var(--sub); margin:16px 0 10px; }
+
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form-grid.wide { grid-template-columns:1fr; }
+.form-group { display:flex; flex-direction:column; gap:4px; }
+.form-group label { font-size:11px; color:var(--sub); text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+.form-group input, .form-group textarea, .form-group select { padding:10px 14px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:6px; color:#fff; font-size:14px; font-family:inherit; resize:vertical; }
+.form-group textarea { min-height:60px; }
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline:none; border-color:var(--accent); }
+
+.card-editor { border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:12px; background:rgba(255,255,255,.02); }
+.card-editor .card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.card-editor .card-header span { font-size:13px; font-weight:600; }
+.card-editor .card-header button { background:rgba(239,68,68,.12); color:#f87171; border:none; border-radius:4px; padding:4px 12px; font-size:12px; cursor:pointer; }
+
+.comp-row-editor { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+.comp-row-editor input { flex:1; padding:8px 12px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:6px; color:#fff; font-size:13px; }
+.comp-row-editor button { background:rgba(239,68,68,.12); color:#f87171; border:none; border-radius:4px; padding:4px 10px; font-size:12px; cursor:pointer; flex-shrink:0; }
+
+.btn-sm { padding:7px 16px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; border:none; transition:all .2s; }
+.btn-accent { background:rgba(62,166,255,.12); color:var(--accent); }
+.btn-accent:hover { background:rgba(62,166,255,.22); }
+.btn-save { background:var(--accent); color:#fff; padding:12px 24px; font-size:15px; width:100%; border-radius:30px; }
+.btn-save:hover { background:#60b5ff; }
+
+.toast { position:fixed; top:20px; right:20px; z-index:9999; padding:14px 22px; border-radius:8px; font-weight:600; color:#fff; animation:toastIn .3s ease; }
+.toast.ok { background:#065f46; } .toast.err { background:#991b1b; }
+@keyframes toastIn { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+table th { text-align:left; padding:10px 14px; font-size:11px; color:var(--sub); text-transform:uppercase; border-bottom:1px solid var(--border); }
+table td { padding:8px 14px; font-size:13px; border-bottom:1px solid rgba(255,255,255,.04); }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="brand">后台<span>管理</span></div>
+  <div class="nav-right" id="navRight"></div>
+</div>
+
+<!-- Login -->
+<div id="loginBox" class="login-box">
+  <h2>管理员登录</h2>
+  <input type="text" id="admUser" placeholder="用户名">
+  <input type="password" id="admPass" placeholder="密码">
+  <button onclick="login()">登 录</button>
+  <p style="color:#f87171;margin-top:12px;font-size:13px;min-height:20px" id="loginErr"></p>
+</div>
+
+<!-- Editor (hidden until login) -->
+<div id="editor" style="display:none" class="container">
+  <h2 style="margin-bottom:20px;font-size:18px;">📝 内容管理</h2>
+
+  <!-- Basic Info -->
+  <div class="section">
+    <h3>📋 基本信息</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>QQ号</label><input id="qq" placeholder="QQ号"></div>
+      <div class="form-group"><label>B站链接</label><input id="bilibili" placeholder="https://space.bilibili.com/..."></div>
+      <div class="form-group"><label>QQ群链接</label><input id="groupLink" placeholder="QQ群链接"></div>
+      <div class="form-group"><label>公告文字</label><input id="notice" placeholder="导航栏公告"></div>
+    </div>
+  </div>
+
+  <!-- Products -->
+  <div id="productsEditor"></div>
+
+  <!-- Comparison Table -->
+  <div class="section">
+    <h3>📊 对比表</h3>
+    <div id="compRows"></div>
+    <button class="btn-sm btn-accent" onclick="addCompRow()" style="margin-top:8px">+ 添加行</button>
+  </div>
+
+  <!-- Save -->
+  <button class="btn-save" onclick="saveAll()" style="margin-top:12px;margin-bottom:60px">💾 保存全部修改</button>
+</div>
+
+<script>
+const API = 'https://ceshishiyong-d1gb3vg9y56ee3be6.service.tcloudbase.com/apiv2';
+const creds = { credentials: 'include' };
+let content = { products: { merge:{cards:[]}, match3:{cards:[]}, rts:{cards:[]} }, comparison: [] };
+
+function toast(msg, type='ok') {
+  const t = document.createElement('div'); t.className = `toast ${type}`; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2500);
+}
+
+async function login() {
+  const u = document.getElementById('admUser').value.trim();
+  const p = document.getElementById('admPass').value;
+  try {
+    const r = await fetch(API+'/api/login', { ...creds, method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u,password:p}) });
+    const d = await r.json();
+    if (!r.ok) { document.getElementById('loginErr').textContent = d.error; return; }
+    if (d.role !== 'admin') { document.getElementById('loginErr').textContent = '仅管理员可登录'; return; }
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('editor').style.display = 'block';
+    document.getElementById('navRight').innerHTML = `<span style="color:#888;font-size:13px">${d.username}</span><button onclick="logout()">退出</button>`;
+    await loadContent();
+    renderAll();
+  } catch(e) { document.getElementById('loginErr').textContent = '登录失败'; }
+}
+
+async function logout() {
+  await fetch(API+'/api/logout', { ...creds, method:'POST' });
+  location.reload();
+}
+
+async function loadContent() {
+  try {
+    const r = await fetch(API+'/api/content', creds);
+    const d = await r.json();
+    if (d && d.products) content = d;
+  } catch(e) { toast('加载失败', 'err'); }
+}
+
+function renderAll() {
+  // Basic info
+  document.getElementById('qq').value = content.qq || '';
+  document.getElementById('bilibili').value = content.bilibili || '';
+  document.getElementById('groupLink').value = content.groupLink || '';
+  document.getElementById('notice').value = content.notice || '';
+
+  // Products
+  const prodKeys = ['merge','match3','rts'];
+  let ph = '';
+  for (const k of prodKeys) {
+    const p = content.products[k] || { label:'', bvid:'', downUrl:'', downPwd:'', screenshot:'', cards:[] };
+    ph += `<div class="section"><h3>📦 ${p.label || k}</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>标签文字</label><input id="prod_${k}_label" value="${esc(p.label)}"></div>
+        <div class="form-group"><label>BV号</label><input id="prod_${k}_bvid" value="${esc(p.bvid)}"></div>
+        <div class="form-group"><label>下载链接</label><input id="prod_${k}_downUrl" value="${esc(p.downUrl)}"></div>
+        <div class="form-group"><label>提取码</label><input id="prod_${k}_downPwd" value="${esc(p.downPwd)}"></div>
+      </div>
+      <div class="form-group wide" style="margin-top:10px"><label>界面截图URL</label><input id="prod_${k}_screenshot" value="${esc(p.screenshot)}"></div>
+      <h4>功能卡片</h4><div id="cards_${k}">`;
+    for (let i=0; i<(p.cards||[]).length; i++) {
+      const c = p.cards[i];
+      ph += `<div class="card-editor">
+        <div class="card-header"><span>卡片 ${i+1}</span><button onclick="delCard('${k}',${i})">删除</button></div>
+        <div class="form-grid">
+          <div class="form-group"><label>图标</label><input id="card_${k}_${i}_icon" value="${esc(c.icon)}"></div>
+          <div class="form-group"><label>标题</label><input id="card_${k}_${i}_title" value="${esc(c.title)}"></div>
+        </div>
+        <div class="form-group wide" style="margin-top:8px"><label>描述</label><input id="card_${k}_${i}_desc" value="${esc(c.desc)}"></div>
+        <div class="form-group wide" style="margin-top:4px"><label>图片URL</label><input id="card_${k}_${i}_img" value="${esc(c.img||'')}"></div>
+      </div>`;
+    }
+    ph += `<button class="btn-sm btn-accent" onclick="addCard('${k}')" style="margin-top:8px">+ 添加卡片</button></div></div>`;
+  }
+  document.getElementById('productsEditor').innerHTML = ph;
+
+  // Comparison
+  renderComp();
+}
+
+function renderComp() {
+  let h = '';
+  for (let i=0; i<content.comparison.length; i++) {
+    const r = content.comparison[i];
+    h += `<div class="comp-row-editor"><input value="${esc(r.feature)}" id="comp_feature_${i}" placeholder="功能名"><input value="${esc(r.free)}" id="comp_free_${i}" placeholder="免费版"><input value="${esc(r.pro)}" id="comp_pro_${i}" placeholder="Pro版"><button onclick="delComp(${i})">✕</button></div>`;
+  }
+  document.getElementById('compRows').innerHTML = h;
+}
+
+function addCard(productKey) {
+  if (!content.products[productKey]) content.products[productKey] = { cards:[] };
+  content.products[productKey].cards.push({ icon:'🆕', title:'新功能', desc:'描述', img:'' });
+  renderAll();
+}
+
+function delCard(productKey, idx) {
+  content.products[productKey].cards.splice(idx, 1);
+  renderAll();
+}
+
+function addCompRow() {
+  content.comparison.push({ feature:'新功能', free:'免费版', pro:'Pro版' });
+  renderComp();
+}
+
+function delComp(idx) {
+  content.comparison.splice(idx, 1);
+  renderComp();
+}
+
+function collectData() {
+  // Basic
+  content.qq = document.getElementById('qq').value;
+  content.bilibili = document.getElementById('bilibili').value;
+  content.groupLink = document.getElementById('groupLink').value;
+  content.notice = document.getElementById('notice').value;
+
+  // Products
+  for (const k of ['merge','match3','rts']) {
+    const p = content.products[k] || {};
+    p.label = document.getElementById(`prod_${k}_label`)?.value || '';
+    p.bvid = document.getElementById(`prod_${k}_bvid`)?.value || '';
+    p.downUrl = document.getElementById(`prod_${k}_downUrl`)?.value || '';
+    p.downPwd = document.getElementById(`prod_${k}_downPwd`)?.value || '';
+    p.screenshot = document.getElementById(`prod_${k}_screenshot`)?.value || '';
+    for (let i=0; i<(p.cards||[]).length; i++) {
+      p.cards[i].icon = document.getElementById(`card_${k}_${i}_icon`)?.value || '';
+      p.cards[i].title = document.getElementById(`card_${k}_${i}_title`)?.value || '';
+      p.cards[i].desc = document.getElementById(`card_${k}_${i}_desc`)?.value || '';
+      p.cards[i].img = document.getElementById(`card_${k}_${i}_img`)?.value || '';
+    }
+    content.products[k] = p;
+  }
+
+  // Comparison
+  for (let i=0; i<content.comparison.length; i++) {
+    content.comparison[i].feature = document.getElementById(`comp_feature_${i}`)?.value || '';
+    content.comparison[i].free = document.getElementById(`comp_free_${i}`)?.value || '';
+    content.comparison[i].pro = document.getElementById(`comp_pro_${i}`)?.value || '';
+  }
+}
+
+async function saveAll() {
+  collectData();
+  try {
+    const r = await fetch(API+'/api/content', { ...creds, method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(content) });
+    if (!r.ok) throw new Error();
+    toast('✅ 保存成功！刷新前台页面即可看到更新');
+  } catch(e) { toast('保存失败', 'err'); }
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+// Check session on load
+(async () => {
+  try {
+    const r = await fetch(API+'/api/session', creds);
+    const d = await r.json();
+    if (d.loggedIn && d.role === 'admin') {
+      document.getElementById('loginBox').style.display = 'none';
+      document.getElementById('editor').style.display = 'block';
+      document.getElementById('navRight').innerHTML = `<span style="color:#888;font-size:13px">${d.username}</span><button onclick="logout()">退出</button>`;
+      await loadContent();
+      renderAll();
+    }
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ const tcb = cloudbase.init({});
 const db = tcb.database();
 const FILES_COLLECTION = 'files';
 const USERS_COLLECTION = 'users';
+const CONTENT_COLLECTION = 'content';
 
 // Seed default users on first deploy
 let seedPromise = (async () => {
@@ -49,7 +50,7 @@ app.use((req, res, next) => {
 });
 
 app.set('trust proxy', 1);
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'file-share-secret-2026',
   resave: false,
@@ -224,6 +225,31 @@ app.delete('/api/files/:name', requireAdmin, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: '删除失败: ' + err.message });
+  }
+});
+
+// --- Content (Public read, Admin write) ---
+app.get('/api/content', async (req, res) => {
+  try {
+    const { data } = await db.collection(CONTENT_COLLECTION).where({ key: 'site' }).limit(1).get();
+    if (!data || data.length === 0) return res.json({});
+    res.json(data[0] || {});
+  } catch (err) {
+    res.json({});
+  }
+});
+
+app.put('/api/content', requireAdmin, async (req, res) => {
+  try {
+    const { data } = await db.collection(CONTENT_COLLECTION).where({ key: 'site' }).limit(1).get();
+    if (data && data.length > 0) {
+      await db.collection(CONTENT_COLLECTION).doc(data[0]._id).update(req.body);
+    } else {
+      await db.collection(CONTENT_COLLECTION).add({ key: 'site', ...req.body });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

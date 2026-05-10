@@ -13,33 +13,25 @@
     --text-main: #f0f0f0;
     --text-sub: #888888;
     --border: #333333;
-
     --btn-primary: #3ea6ff;
     --btn-primary-hover: #60b5ff;
-
     --tag-blue: rgba(62, 166, 255, 0.15); --tag-blue-text: #3ea6ff;
     --tag-purple: rgba(168, 85, 247, 0.15); --tag-purple-text: #d8b4fe;
     --tag-orange: rgba(249, 115, 22, 0.15); --tag-orange-text: #fdba74;
   }
 
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text-main); margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; -webkit-font-smoothing: antialiased; }
-
   .nav { width: 100%; padding: 15px 0 5px 0; text-align: center; border-bottom: 1px solid var(--border); background: rgba(15, 15, 17, 0.95); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100; }
   .nav-inner { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px; overflow: hidden; }
-
   .brand { font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #fff; margin-bottom: 5px; }
   .brand span { color: var(--accent); }
   .notice { font-size: 12px; color: #f87171; font-weight: 600; }
 
-  .product-matrix {
-    display: flex; gap: 12px; width: 100%; max-width: 100%; overflow-x: auto; padding: 0 20px 15px 20px; box-sizing: border-box; justify-content: flex-start; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  }
+  .product-matrix { display: flex; gap: 12px; width: 100%; max-width: 100%; overflow-x: auto; padding: 0 20px 15px 20px; box-sizing: border-box; justify-content: flex-start; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .product-matrix::-webkit-scrollbar { display: none; }
   @media(min-width: 600px) { .product-matrix { justify-content: center; overflow-x: visible; } }
 
-  .tag {
-    font-size: 13px; padding: 8px 16px; border-radius: 8px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; cursor: pointer; transition: all 0.3s; opacity: 0.5; filter: grayscale(0.4); background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); flex-shrink: 0;
-  }
+  .tag { font-size: 13px; padding: 8px 16px; border-radius: 8px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; cursor: pointer; transition: all 0.3s; opacity: 0.5; filter: grayscale(0.4); background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); flex-shrink: 0; }
   .tag:hover { opacity: 0.8; transform: translateY(-2px); }
   .tag.active { opacity: 1; filter: grayscale(0); transform: scale(1.05); box-shadow: 0 5px 20px rgba(0,0,0,0.5); border-width: 1px; }
   .tag.active.blue   { background: var(--tag-blue); color: var(--tag-blue-text); border-color: var(--tag-blue-text); box-shadow: 0 0 15px rgba(62, 166, 255, 0.2); }
@@ -49,9 +41,7 @@
 
   .container { max-width: 800px; width: 90%; margin: 30px auto; flex: 1; }
 
-  .video-container {
-    width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.6); margin-bottom: 40px; position: relative; display: flex; align-items: center; justify-content: center;
-  }
+  .video-container { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,0.6); margin-bottom: 40px; position: relative; display: flex; align-items: center; justify-content: center; }
   .video-container iframe { width: 100%; height: 100%; border: none; }
 
   .empty-state { text-align: center; color: var(--text-sub); animation: fadeIn 0.5s; padding: 20px; }
@@ -77,11 +67,9 @@
   .comp-row:last-child { border-bottom: none; }
   .comp-col { flex: 1; padding: 15px 10px; text-align: center; font-size: 13px; display: flex; align-items: center; justify-content: center; color: #ccc; }
   .comp-col.feature { flex: 1.2; justify-content: flex-start; text-align: left; color: #fff; font-weight: 600; padding-left: 20px; }
-
   .comp-header { background: #222; font-weight: 700; color: #fff; letter-spacing: 1px; }
   .col-free { color: #aaa; }
   .col-pro { color: var(--accent); position: relative; font-weight: 800; }
-
   .check { color: #4cd964; font-weight: bold; font-size: 16px; }
   .cross { color: #555; font-size: 14px; opacity: 0.5; }
   .limit { color: #eebb00; font-size: 12px; border: 1px solid rgba(238, 187, 0, 0.3); padding: 2px 6px; border-radius: 4px; background: rgba(238, 187, 0, 0.1); }
@@ -89,206 +77,182 @@
   .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 60px; }
   .btn { cursor: pointer; text-decoration: none; padding: 14px 20px; border-radius: 30px; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; border: none; outline: none; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
   .btn:active { transform: scale(0.96); }
-
   .btn-download { width: 100%; background: var(--btn-primary); color: #fff; box-shadow: 0 10px 25px rgba(62, 166, 255, 0.3); font-size: 17px; }
   .btn-download:hover { background: var(--btn-primary-hover); transform: translateY(-2px); box-shadow: 0 15px 35px rgba(62, 166, 255, 0.4); }
   .btn-download.disabled { background: #333; color: #666; cursor: not-allowed; box-shadow: none; pointer-events: none; }
-
   .btn-equal { flex: 1; min-width: 0; padding-left: 10px; padding-right: 10px; font-size: 13px; }
   .btn-bilibili { background: #fb7299; color: #fff; box-shadow: 0 5px 15px rgba(251, 114, 153, 0.2); }
   .btn-bilibili:hover { background: #f95886; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(251, 114, 153, 0.4); }
   .btn-secondary { background: rgba(255,255,255,0.08); color: #ccc; border: 1px solid rgba(255,255,255,0.1); }
   .btn-secondary:hover { background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.3); }
-
   footer { margin-top: auto; padding: 30px; text-align: center; font-size: 12px; color: #444; width: 100%; border-top: 1px solid #222; }
 </style>
-
-<script>
-  // 资源库
-  const ASSETS = {
-    merge_build: "https://raw.githubusercontent.com/robinashikder6738-eng/my-web-assets/main/demo_board.gif.gif",
-    merge_touch: "https://raw.githubusercontent.com/robinashikder6738-eng/my-web-assets/main/demo_touch.gif.gif",
-    merge_audio: "https://raw.githubusercontent.com/robinashikder6738-eng/my-web-assets/main/demo_auto.gif.gif",
-    ui_merge: "https://raw.githubusercontent.com/robinashikder6738-eng/my-web-assets/main/合成玩法脚本(正式版v1.1.0)-展示图.png"
-  };
-
-  const PRODUCT_DATA = {
-    "merge": {
-      bvid: "BV1EPSCBVExn",
-      downUrl: "https://wwbmw.lanzn.com/icIv53f9gsmj",
-      downPwd: "6u1y",
-      screenshot: ASSETS.ui_merge,
-      cards: [
-        { icon: "⚡️", title: "极速棋盘构建", desc: "素材一键打包预合成，参数化生成标准网格布局。", media: `<img src="${ASSETS.merge_build}">` },
-        { icon: "👆", title: "标记驱动动画", desc: "仅需打上标记，自动演算生成丝滑的拟真手指轨迹。", media: `<img src="${ASSETS.merge_touch}">` },
-        { icon: "🛠️", title: "智能视听补全", desc: "自动分析动作节奏，一键批量填充点击音效与特效。", media: `<img src="${ASSETS.merge_audio}">` }
-      ]
-    },
-    "match3": {
-       bvid: "",
-       downUrl: "", downPwd: "", screenshot: "",
-       cards: [
-       { icon: "💎", title: "三消逻辑", desc: "专为三消游戏设计，支持消除特效、连击判定与掉落动画。", media: "" },
-       { icon: "🎨", title: "素材库", desc: "内置多种通用宝石与道具素材，拖入即用，快速出片。", media: "" },
-       { icon: "🚧", title: "开发中", desc: "该功能目前正在内测中，敬请期待正式发布。", media: "" }
-     ]
-    },
-    "rts": {
-       bvid: "",
-       downUrl: "", downPwd: "", screenshot: "",
-       cards: [
-       { icon: "⚔️", title: "战斗模拟", desc: "模拟 RTS 游戏单位寻路、攻击判定与血条扣减逻辑。", media: "" },
-       { icon: "🤖", title: "群组AI", desc: "内置阵型算法，一键生成大规模军团移动与冲锋动画。", media: "" },
-       { icon: "🚧", title: "开发中", desc: "该功能目前正在内测中，敬请期待正式发布。", media: "" }
-     ]
-    }
-  };
-
-  function contactQQ() {
-    const qqId = "3438459609";
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(qqId).then(() => {
-            const isJump = confirm("✅ QQ号 [" + qqId + "] 已复制！\n\n点击【确定】将尝试直接打开 QQ 发起会话。");
-            if(isJump) window.location.href = "tencent://message/?uin=" + qqId + "&Site=GaryScript&Menu=yes";
-        }).catch(err => { prompt("请手动复制 QQ 号：", qqId); });
-    } else { prompt("请手动复制 QQ 号：", qqId); }
-  }
-
-  function downloadScript(url, pwd) {
-    if (!url) return;
-    if (pwd) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(pwd).then(() => {
-                alert("✅ 提取码 [" + pwd + "] 已自动复制！\n\n即将跳转网盘，请在页面中粘贴提取码。");
-                window.open(url, '_blank');
-            }).catch(() => { prompt("请手动复制提取码：", pwd); window.open(url, '_blank'); });
-        } else { prompt("请手动复制提取码：", pwd); window.open(url, '_blank'); }
-    } else { window.open(url, '_blank'); }
-  }
-
-  function switchTab(el, productKey) {
-    document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
-    if(el) el.classList.add('active');
-
-    const data = PRODUCT_DATA[productKey];
-    if(!data) return;
-
-    const vidContainer = document.getElementById('main-screen');
-    if (data.bvid) {
-      vidContainer.innerHTML = `<iframe src="//player.bilibili.com/player.html?bvid=${data.bvid}&page=1&high_quality=1&danmaku=0&autoplay=0" scrolling="no" allowfullscreen="true" sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"></iframe>`;
-    } else {
-      vidContainer.innerHTML = `<div class="empty-state" style="padding:50px;"><span style="font-size:40px">🚧</span><br><br><span style="color:#666">该功能正在紧张开发测试中...</span></div>`;
-    }
-
-    const cardContainer = document.getElementById('card-grid');
-    cardContainer.style.opacity = '0.5';
-    setTimeout(() => {
-      let html = "";
-      if (data.cards) {
-        data.cards.forEach(card => {
-            const mediaContent = card.media ? card.media : `<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:#444;font-size:30px;">${card.icon}</div>`;
-            html += `<div class="card"><div class="card-media">${mediaContent}</div><div class="card-content"><h3>${card.icon} ${card.title}</h3><p>${card.desc}</p></div></div>`;
-        });
-      }
-      cardContainer.innerHTML = html;
-      cardContainer.style.opacity = '1';
-    }, 150);
-
-    const uiBox = document.getElementById('ui-preview-box');
-    const uiContainer = document.getElementById('ui-section');
-    const compBox = document.getElementById('comp-section');
-
-    if (data.screenshot) {
-        uiBox.innerHTML = `<img src="${data.screenshot}" alt="Script UI">`;
-        uiContainer.style.display = 'block';
-        if(compBox) compBox.style.display = 'block';
-    } else {
-        uiContainer.style.display = 'none';
-        if(compBox) compBox.style.display = 'none';
-    }
-
-    const btnDown = document.getElementById('btn-download');
-    const newBtn = btnDown.cloneNode(true);
-    btnDown.parentNode.replaceChild(newBtn, btnDown);
-
-    if (data.downUrl) {
-        newBtn.classList.remove('disabled');
-        newBtn.innerHTML = "<span>🚀 立即下载正式版</span>";
-        newBtn.onclick = function() { downloadScript(data.downUrl, data.downPwd); };
-        newBtn.removeAttribute("href");
-    } else {
-        newBtn.classList.add('disabled');
-        newBtn.innerHTML = "<span>🕒 敬请期待</span>";
-        newBtn.onclick = null;
-    }
-  }
-</script>
 </head>
-<body onload="switchTab(document.querySelector('.tag.active'), 'merge')">
+<body>
 
 <div class="nav">
   <div class="nav-inner">
     <div class="brand">AE买量 <span>脚本</span></div>
-    <div class="notice">原QQ号：2711715164 被盗，请勿添加；新的：3438459609</div>
-    <div class="product-matrix">
-      <div class="tag blue active" onclick="switchTab(this, 'merge')">🟦 合成玩法 Pro</div>
-      <div class="tag purple" onclick="switchTab(this, 'match3')">🟪 三消玩法 测试</div>
-      <div class="tag orange" onclick="switchTab(this, 'rts')">🟧 RTS战斗模拟 测试</div>
-      <div class="tag gray">🚧 更多开发中...</div>
-    </div>
+    <div class="notice" id="noticeBar"></div>
+    <div class="product-matrix" id="tagBar"></div>
   </div>
 </div>
 
 <div class="container">
   <div class="video-container" id="main-screen"></div>
   <div class="grid" id="card-grid"></div>
-
-  <div class="ui-section" id="ui-section" style="display:none;">
+  <div class="ui-section" id="ui-section" style="display:none">
     <div class="ui-title">// 界面预览 & 版本对比 //</div>
     <div class="ui-image-box" id="ui-preview-box"></div>
   </div>
-
-  <div class="comparison-box" id="comp-section">
-    <div class="comp-row comp-header">
-      <div class="comp-col feature">功能特性</div>
-      <div class="comp-col col-free">免费版</div>
-      <div class="comp-col col-pro">Pro 专业版</div>
-    </div>
-    <div class="comp-row">
-      <div class="comp-col feature">棋盘构建</div>
-      <div class="comp-col"><span class="limit">限制 4x4</span></div>
-      <div class="comp-col"><span class="check">任意尺寸</span></div>
-    </div>
-    <div class="comp-row">
-      <div class="comp-col feature">动画轨迹</div>
-      <div class="comp-col"><span class="limit">仅直线</span></div>
-      <div class="comp-col"><span class="check">拟真贝塞尔</span></div>
-    </div>
-    <div class="comp-row">
-      <div class="comp-col feature">交互动作</div>
-      <div class="comp-col"><span class="limit">仅合成、交换</span></div>
-      <div class="comp-col"><span class="check">8种交互动作</span></div>
-    </div>
-    <div class="comp-row">
-      <div class="comp-col feature">智能音效补全</div>
-      <div class="comp-col"><span class="cross">✕</span></div>
-      <div class="comp-col"><span class="check">一键批量生成</span></div>
-    </div>
-    <div class="comp-row">
-      <div class="comp-col feature">售后技术支持</div>
-      <div class="comp-col"><span class="cross">✕</span></div>
-      <div class="comp-col"><span class="check">一对一指导</span></div>
-    </div>
-  </div>
-
-  <div class="actions">
-    <a href="#" id="btn-download" class="btn btn-download"><span>🚀 立即下载</span></a>
-    <a href="https://space.bilibili.com/1403616179" target="_blank" class="btn btn-bilibili btn-equal"><span>📺 B站主页</span></a>
-    <button class="btn btn-secondary btn-equal" onclick="contactQQ()"><span>🐧 QQ咨询</span></button>
-    <a href="https://qm.qq.com/cgi-bin/qm/qr?k=1078387523" target="_blank" class="btn btn-secondary btn-equal"><span>👥 售后群</span></a>
-  </div>
+  <div class="comparison-box" id="comp-section"></div>
+  <div class="actions" id="actionBar"></div>
 </div>
 
 <footer>Designed by Gary &copy; 2025<br>仅供学习交流，请支持正版</footer>
+
+<script>
+const API = 'https://ceshishiyong-d1gb3vg9y56ee3be6.service.tcloudbase.com/apiv2';
+let DATA = null;
+let currentKey = 'merge';
+
+async function init() {
+  try {
+    const r = await fetch(API+'/api/content', { credentials:'include' });
+    DATA = await r.json();
+    if (!DATA || !DATA.products) return;
+    renderPage();
+    switchTab('merge');
+  } catch(e) { console.error(e); }
+}
+
+function renderPage() {
+  // Notice
+  document.getElementById('noticeBar').textContent = DATA.notice || '';
+
+  // Tags
+  const tagBar = document.getElementById('tagBar');
+  tagBar.innerHTML = '';
+  const colors = ['blue','purple','orange'];
+  let idx = 0;
+  for (const [key, prod] of Object.entries(DATA.products || {})) {
+    const c = colors[idx] || 'blue';
+    const tag = document.createElement('div');
+    tag.className = `tag ${c}`;
+    tag.textContent = prod.label || key;
+    tag.onclick = () => switchTab(key);
+    tagBar.appendChild(tag);
+    idx++;
+  }
+  const more = document.createElement('div');
+  more.className = 'tag gray';
+  more.textContent = '🚧 更多开发中...';
+  tagBar.appendChild(more);
+
+  // Comparison table
+  const comp = document.getElementById('comp-section');
+  if (DATA.comparison && DATA.comparison.length > 0) {
+    let h = '<div class="comp-row comp-header"><div class="comp-col feature">功能特性</div><div class="comp-col col-free">免费版</div><div class="comp-col col-pro">Pro 专业版</div></div>';
+    for (const row of DATA.comparison) {
+      const isCheck = row.pro.includes('✓') || row.pro.includes('✔') || (!row.pro.includes('✕') && row.pro.length > 0 && row.pro !== '无' && row.pro !== '不支持');
+      const proCls = row.pro.includes('✕') ? 'cross' : 'check';
+      const freeCls = row.free.includes('✕') ? 'cross' : (row.free.includes('限制') || row.free.includes('仅')) ? 'limit' : 'check';
+      h += `<div class="comp-row"><div class="comp-col feature">${esc(row.feature)}</div><div class="comp-col"><span class="${freeCls}">${esc(row.free)}</span></div><div class="comp-col"><span class="${proCls}">${esc(row.pro)}</span></div></div>`;
+    }
+    comp.innerHTML = h;
+  }
+
+  // Action buttons
+  const ab = document.getElementById('actionBar');
+  ab.innerHTML = `
+    <a href="#" id="btn-download" class="btn btn-download"><span>🚀 立即下载</span></a>
+    <a href="${esc(DATA.bilibili||'#')}" target="_blank" class="btn btn-bilibili btn-equal"><span>📺 B站主页</span></a>
+    <button class="btn btn-secondary btn-equal" onclick="contactQQ()"><span>🐧 QQ咨询</span></button>
+    <a href="${esc(DATA.groupLink||'#')}" target="_blank" class="btn btn-secondary btn-equal"><span>👥 售后群</span></a>`;
+}
+
+function switchTab(key) {
+  currentKey = key;
+  const tags = document.querySelectorAll('.tag:not(.gray)');
+  const keys = Object.keys(DATA.products || {});
+  tags.forEach((t, i) => { t.classList.toggle('active', keys[i] === key); });
+
+  const prod = DATA.products[key];
+  if (!prod) return;
+
+  // Video
+  const vc = document.getElementById('main-screen');
+  if (prod.bvid) {
+    vc.innerHTML = `<iframe src="//player.bilibili.com/player.html?bvid=${prod.bvid}&page=1&high_quality=1&danmaku=0&autoplay=0" scrolling="no" allowfullscreen="true" sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"></iframe>`;
+  } else {
+    vc.innerHTML = '<div class="empty-state" style="padding:50px"><span style="font-size:40px">🚧</span><br><br><span style="color:#666">该功能正在紧张开发测试中...</span></div>';
+  }
+
+  // Cards
+  const grid = document.getElementById('card-grid');
+  grid.style.opacity = '0.5';
+  setTimeout(() => {
+    let h = '';
+    for (const c of (prod.cards || [])) {
+      const media = c.img ? `<img src="${esc(c.img)}">` : `<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:#444;font-size:30px">${c.icon}</div>`;
+      h += `<div class="card"><div class="card-media">${media}</div><div class="card-content"><h3>${c.icon} ${esc(c.title)}</h3><p>${esc(c.desc)}</p></div></div>`;
+    }
+    grid.innerHTML = h;
+    grid.style.opacity = '1';
+  }, 150);
+
+  // Screenshot
+  const ui = document.getElementById('ui-section');
+  const uibox = document.getElementById('ui-preview-box');
+  if (prod.screenshot) {
+    uibox.innerHTML = `<img src="${esc(prod.screenshot)}" alt="UI">`;
+    ui.style.display = 'block';
+  } else {
+    ui.style.display = 'none';
+  }
+
+  // Download button
+  const btn = document.getElementById('btn-download');
+  const nb = btn.cloneNode(true);
+  btn.parentNode.replaceChild(nb, btn);
+  if (prod.downUrl) {
+    nb.classList.remove('disabled');
+    nb.innerHTML = '<span>🚀 立即下载正式版</span>';
+    nb.onclick = () => downloadScript(prod.downUrl, prod.downPwd);
+    nb.removeAttribute('href');
+  } else {
+    nb.classList.add('disabled');
+    nb.innerHTML = '<span>🕒 敬请期待</span>';
+    nb.onclick = null;
+  }
+}
+
+function contactQQ() {
+  const qq = DATA.qq || '2942029576';
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(qq).then(() => {
+      if (confirm('✅ QQ号 [' + qq + '] 已复制！\n\n点击【确定】尝试直接打开 QQ。')) {
+        location.href = 'tencent://message/?uin=' + qq;
+      }
+    }).catch(() => prompt('请手动复制 QQ 号：', qq));
+  } else { prompt('请手动复制 QQ 号：', qq); }
+}
+
+function downloadScript(url, pwd) {
+  if (!url) return;
+  if (pwd) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(pwd).then(() => {
+        alert('✅ 提取码 [' + pwd + '] 已自动复制！\n\n即将跳转网盘，请粘贴提取码。');
+        window.open(url, '_blank');
+      }).catch(() => { prompt('请手动复制提取码：', pwd); window.open(url, '_blank'); });
+    } else { prompt('请手动复制提取码：', pwd); window.open(url, '_blank'); }
+  } else { window.open(url, '_blank'); }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+init();
+</script>
 </body>
 </html>
