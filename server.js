@@ -6,8 +6,11 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+// Frontend origin for CORS
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -30,6 +33,19 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
 
+// CORS
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', FRONTEND_ORIGIN);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+// Trust proxy for Railway
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -38,7 +54,12 @@ app.use(session({
   secret: crypto.randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true
+  }
 }));
 
 // Auth middleware
@@ -52,6 +73,9 @@ function requireAdmin(req, res, next) {
   if (req.session.user.role !== 'admin') return res.status(403).json({ error: '仅管理员可操作' });
   next();
 }
+
+// Health check
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // --- Auth Routes ---
 app.post('/api/login', (req, res) => {
@@ -80,17 +104,10 @@ app.get('/api/session', (req, res) => {
 app.get('/api/files', requireAuth, (req, res) => {
   const files = fs.readdirSync(UPLOADS_DIR).map(name => {
     const stat = fs.statSync(path.join(UPLOADS_DIR, name));
-    // Extract original name by stripping timestamp prefix
     const match = name.match(/^\d+-(.+)$/);
     const originalName = match ? match[1] : name;
-    return {
-      name,
-      originalName,
-      size: stat.size,
-      uploadedAt: stat.mtime
-    };
+    return { name, originalName, size: stat.size, uploadedAt: stat.mtime };
   });
-  // Latest first
   files.sort((a, b) => b.uploadedAt - a.uploadedAt);
   res.json(files);
 });
@@ -101,7 +118,6 @@ app.get('/api/files/:name', requireAuth, (req, res) => {
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: '文件不存在' });
   }
-  // Extract original name from stored filename
   const match = req.params.name.match(/^\d+-(.+)$/);
   const downloadName = match ? match[1] : req.params.name;
   res.download(filePath, downloadName);
@@ -124,7 +140,6 @@ app.delete('/api/files/:name', requireAdmin, (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-  console.log('Admin account: admin / admin123');
-  console.log('User account:  user  / user123');
+  console.log(`Server running on port ${PORT}`);
+  console.log('Admin: admin / admin123  |  User: user / user123');
 });

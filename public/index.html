@@ -3,30 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>文件共享平台</title>
+  <title>FileShare - 文件共享平台</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Background decoration -->
+  <div class="bg-shapes">
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+    <div class="bg-shape bg-shape-3"></div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toastContainer" class="toast-container"></div>
+
   <!-- Login Page -->
   <div id="loginPage" class="page active">
     <div class="login-card">
-      <h1>文件共享平台</h1>
-      <p class="subtitle">登录以继续</p>
+      <div class="login-icon">
+        <svg viewBox="0 0 48 48" fill="none"><rect x="6" y="8" width="36" height="32" rx="4" stroke="currentColor" stroke-width="3"/><path d="M18 24l4 4 8-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h1>FileShare</h1>
+      <p class="subtitle">安全高效的文件共享平台</p>
       <form id="loginForm">
         <div class="form-group">
-          <label for="username">用户名</label>
+          <label for="username">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+            用户名
+          </label>
           <input type="text" id="username" placeholder="admin 或 user" required autocomplete="username">
         </div>
         <div class="form-group">
-          <label for="password">密码</label>
+          <label for="password">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+            密码
+          </label>
           <input type="password" id="password" placeholder="输入密码" required autocomplete="current-password">
         </div>
-        <button type="submit" id="loginBtn">登 录</button>
+        <button type="submit" id="loginBtn">
+          <span>登 录</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
         <p class="error-msg" id="loginError"></p>
       </form>
       <div class="login-hint">
-        <p>管理员: admin / admin123</p>
-        <p>普通用户: user / user123</p>
+        <div class="hint-item">
+          <span class="hint-role admin">管理员</span>
+          <code>admin / admin123</code>
+        </div>
+        <div class="hint-item">
+          <span class="hint-role user">用户</span>
+          <code>user / user123</code>
+        </div>
       </div>
     </div>
   </div>
@@ -34,42 +62,101 @@
   <!-- Main Page -->
   <div id="mainPage" class="page">
     <header>
-      <h1>文件共享平台</h1>
+      <div class="header-brand">
+        <svg viewBox="0 0 48 48" fill="none"><rect x="6" y="8" width="36" height="32" rx="4" stroke="currentColor" stroke-width="3"/><path d="M18 24l4 4 8-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h1>FileShare</h1>
+      </div>
       <div class="header-right">
         <span id="userBadge"></span>
-        <button id="logoutBtn">退出登录</button>
+        <button id="logoutBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          退出
+        </button>
       </div>
     </header>
 
     <div class="container">
+      <!-- Stats Bar -->
+      <div class="stats-bar" id="statsBar" style="display:none">
+        <div class="stat-card">
+          <div class="stat-icon files-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="statFileCount">0</span>
+            <span class="stat-label">文件总数</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon size-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="statTotalSize">0 B</span>
+            <span class="stat-label">总大小</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Upload Section (Admin Only) -->
-      <div id="uploadSection" class="card" style="display:none">
-        <h2>上传文件</h2>
+      <div id="uploadSection" class="card upload-card" style="display:none">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            上传文件
+          </h2>
+        </div>
         <form id="uploadForm">
           <div class="upload-area" id="dropZone">
-            <p>拖拽文件到此处，或点击选择文件</p>
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4M5 11l7-7 7 7"/><path d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg>
+            </div>
+            <p class="upload-text">拖拽文件到此处<span class="upload-divider">|</span>点击选择文件</p>
+            <p class="upload-hint">支持单个或批量上传，单文件最大 500MB</p>
             <input type="file" id="fileInput" multiple>
-            <p class="file-name" id="fileName"></p>
           </div>
-          <button type="submit" id="uploadBtn" disabled>上传</button>
+          <div class="file-name" id="fileName"></div>
+          <div class="upload-actions">
+            <button type="submit" id="uploadBtn" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              开始上传
+            </button>
+          </div>
           <progress id="uploadProgress" value="0" max="100" style="display:none"></progress>
           <p class="error-msg" id="uploadError"></p>
         </form>
       </div>
 
       <!-- File List -->
-      <div class="card">
-        <div class="file-list-header">
-          <h2>文件列表</h2>
-          <button id="refreshBtn">刷新</button>
+      <div class="card file-list-card">
+        <div class="card-header">
+          <h2>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            文件列表
+          </h2>
+          <div class="header-actions">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input type="text" id="searchInput" placeholder="搜索文件...">
+            </div>
+            <button id="refreshBtn" class="btn-icon" title="刷新列表">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
         </div>
         <div id="fileList" class="file-list">
-          <p class="empty-msg">加载中...</p>
+          <!-- Skeleton loading -->
+          <div class="skeleton-list" id="skeletonLoading">
+            <div class="skeleton-item"><div class="skeleton-line w60"></div><div class="skeleton-line w30"></div></div>
+            <div class="skeleton-item"><div class="skeleton-line w70"></div><div class="skeleton-line w25"></div></div>
+            <div class="skeleton-item"><div class="skeleton-line w50"></div><div class="skeleton-line w35"></div></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
