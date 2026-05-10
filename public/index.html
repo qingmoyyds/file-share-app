@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件共享平台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login Page -->
+  <div id="loginPage" class="page active">
+    <div class="login-card">
+      <h1>文件共享平台</h1>
+      <p class="subtitle">登录以继续</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">用户名</label>
+          <input type="text" id="username" placeholder="admin 或 user" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="password">密码</label>
+          <input type="password" id="password" placeholder="输入密码" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="loginBtn">登 录</button>
+        <p class="error-msg" id="loginError"></p>
+      </form>
+      <div class="login-hint">
+        <p>管理员: admin / admin123</p>
+        <p>普通用户: user / user123</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Page -->
+  <div id="mainPage" class="page">
+    <header>
+      <h1>文件共享平台</h1>
+      <div class="header-right">
+        <span id="userBadge"></span>
+        <button id="logoutBtn">退出登录</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- Upload Section (Admin Only) -->
+      <div id="uploadSection" class="card" style="display:none">
+        <h2>上传文件</h2>
+        <form id="uploadForm">
+          <div class="upload-area" id="dropZone">
+            <p>拖拽文件到此处，或点击选择文件</p>
+            <input type="file" id="fileInput" multiple>
+            <p class="file-name" id="fileName"></p>
+          </div>
+          <button type="submit" id="uploadBtn" disabled>上传</button>
+          <progress id="uploadProgress" value="0" max="100" style="display:none"></progress>
+          <p class="error-msg" id="uploadError"></p>
+        </form>
+      </div>
+
+      <!-- File List -->
+      <div class="card">
+        <div class="file-list-header">
+          <h2>文件列表</h2>
+          <button id="refreshBtn">刷新</button>
+        </div>
+        <div id="fileList" class="file-list">
+          <p class="empty-msg">加载中...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
