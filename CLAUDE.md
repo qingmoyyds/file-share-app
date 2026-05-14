@@ -2,6 +2,22 @@
 
 AE买量脚本产品展示站 + 后台管理系统。前端纯静态 HTML，后端 Express，部署在腾讯云 CloudBase。
 
+## 关于仓库所有者
+
+- 称呼：你（中文交流）
+- 操作系统：Windows 11
+- 代码风格偏好：别写注释、别过度抽象、别加半成品功能
+- 本仓库就是全部信息源，不需要再问我要凭证或配置
+- GitHub: qingmoyyds | Gitee: qingmoyyds
+
+## CloudBase 环境
+
+- 环境 ID: `ceshishiyong-d1gb3vg9y56ee3be6`
+- 线上 API 地址: `https://ceshishiyong-d1gb3vg9y56ee3be6.service.tcloudbase.com/apiv2`
+- 静态托管域名: 同上环境
+- 数据库集合: `users`, `files`, `content`
+- 如需部署/操作线上 → 先 `tcb login`
+
 ## 架构
 
 ```
