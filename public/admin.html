@@ -109,7 +109,7 @@ table td { padding:8px 14px; font-size:13px; border-bottom:1px solid rgba(255,25
 </div>
 
 <script>
-const API = 'https://ceshishiyong-d1gb3vg9y56ee3be6.service.tcloudbase.com/apiv2';
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? '' : 'https://ceshishiyong-d1gb3vg9y56ee3be6.service.tcloudbase.com/apiv2';
 const creds = { credentials: 'include' };
 let content = { products: { merge:{cards:[]}, match3:{cards:[]}, rts:{cards:[]} }, comparison: [] };
 

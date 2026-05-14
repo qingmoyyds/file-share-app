@@ -7,6 +7,8 @@
     "multer": "^1.4.5-lts.2",
     "express-session": "^1.17.3",
     "@cloudbase/node-sdk": "^2.0.0",
-    "serverless-http": "^3.2.0"
+    "serverless-http": "^3.2.0",
+    "bcryptjs": "^2.4.3",
+    "express-rate-limit": "^7.1.5"
   }
 }

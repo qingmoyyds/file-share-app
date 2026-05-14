@@ -4,6 +4,8 @@ const session = require('express-session');
 const serverless = require('serverless-http');
 const cloudbase = require('@cloudbase/node-sdk');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -14,19 +16,7 @@ const FILES_COLLECTION = 'files';
 const USERS_COLLECTION = 'users';
 const CONTENT_COLLECTION = 'content';
 
-// Seed default users on first deploy
-let seedPromise = (async () => {
-  try {
-    const { data } = await db.collection(USERS_COLLECTION).limit(1).get();
-    if (!data || data.length === 0) {
-      await db.collection(USERS_COLLECTION).add({ username: 'admin', password: 'admin123', role: 'admin' });
-      await db.collection(USERS_COLLECTION).add({ username: 'user', password: 'user123', role: 'user' });
-      console.log('Default users seeded');
-    }
-  } catch (e) {
-    console.error('Seed error:', e.message);
-  }
-})();
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
@@ -39,9 +29,20 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// CORS
+// Verify password, handling both bcrypt and legacy plaintext
+function verifyPassword(input, stored) {
+  if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
+    return bcrypt.compareSync(input, stored);
+  }
+  return input === stored;
+}
+
+// CORS with whitelist
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+    res.header('Access-Control-Allow-Origin', origin || ALLOWED_ORIGINS[0]);
+  }
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
@@ -52,22 +53,51 @@ app.use((req, res, next) => {
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'file-share-secret-2026',
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000, sameSite: 'none', secure: true }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true
+  }
 }));
 
+// Rate limit for login
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: '登录尝试过于频繁，请15分钟后再试' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // --- Auth ---
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: '用户名和密码不能为空' });
+    }
     const { data } = await db.collection(USERS_COLLECTION).where({ username }).limit(1).get();
-    if (!data || data.length === 0 || data[0].password !== password) {
+    if (!data || data.length === 0) {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
-    req.session.user = { username, role: data[0].role };
-    res.json({ ok: true, role: data[0].role, username });
+    const user = data[0];
+
+    if (!verifyPassword(password, user.password)) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+
+    // Upgrade plaintext password to bcrypt
+    if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
+      const hash = bcrypt.hashSync(password, 10);
+      await db.collection(USERS_COLLECTION).doc(user._id).update({ password: hash });
+    }
+
+    req.session.user = { username, role: user.role };
+    res.json({ ok: true, role: user.role, username });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -86,11 +116,9 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 // --- User Management (Admin Only) ---
 
-// List users
 app.get('/api/users', requireAdmin, async (req, res) => {
   try {
     const { data } = await db.collection(USERS_COLLECTION).orderBy('username', 'asc').get();
-    // Don't expose passwords
     const users = (data || []).map(u => ({ username: u.username, role: u.role, _id: u._id }));
     res.json(users);
   } catch (err) {
@@ -98,7 +126,6 @@ app.get('/api/users', requireAdmin, async (req, res) => {
   }
 });
 
-// Create user
 app.post('/api/users', requireAdmin, async (req, res) => {
   try {
     const { username, password, role } = req.body;
@@ -109,14 +136,14 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     const { data: existing } = await db.collection(USERS_COLLECTION).where({ username }).limit(1).get();
     if (existing && existing.length > 0) return res.status(409).json({ error: '用户名已存在' });
 
-    await db.collection(USERS_COLLECTION).add({ username, password, role: role || 'user' });
+    const hash = bcrypt.hashSync(password, 10);
+    await db.collection(USERS_COLLECTION).add({ username, password: hash, role: role || 'user' });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Delete user
 app.delete('/api/users/:username', requireAdmin, async (req, res) => {
   try {
     if (req.params.username === req.session.user.username) {
@@ -131,7 +158,6 @@ app.delete('/api/users/:username', requireAdmin, async (req, res) => {
   }
 });
 
-// Reset password
 app.put('/api/users/:username/password', requireAdmin, async (req, res) => {
   try {
     const { password } = req.body;
@@ -140,14 +166,14 @@ app.put('/api/users/:username/password', requireAdmin, async (req, res) => {
     const { data } = await db.collection(USERS_COLLECTION).where({ username: req.params.username }).limit(1).get();
     if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
 
-    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password });
+    const hash = bcrypt.hashSync(password, 10);
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: hash });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Change own password (any authenticated user)
 app.put('/api/password', requireAuth, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
@@ -155,9 +181,10 @@ app.put('/api/password', requireAuth, async (req, res) => {
 
     const { data } = await db.collection(USERS_COLLECTION).where({ username: req.session.user.username }).limit(1).get();
     if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
-    if (data[0].password !== oldPassword) return res.status(403).json({ error: '原密码错误' });
+    if (!verifyPassword(oldPassword, data[0].password)) return res.status(403).json({ error: '原密码错误' });
 
-    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: newPassword });
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: hash });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -241,7 +268,6 @@ app.get('/api/content', async (req, res) => {
 
 app.put('/api/content', requireAdmin, async (req, res) => {
   try {
-    // Clean: remove _id and key to avoid DB errors
     const payload = { ...req.body };
     delete payload._id;
     delete payload.key;
