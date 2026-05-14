@@ -120,10 +120,10 @@ async function init() {
   try {
     const r = await fetch(API+'/api/content', { credentials:'include' });
     DATA = await r.json();
-    if (!DATA || !DATA.products) return;
+    if (!DATA || !DATA.products) { document.getElementById('main-screen').innerHTML = '<div class="empty-state">加载内容失败，请刷新页面重试</div>'; return; }
     renderPage();
     switchTab('merge');
-  } catch(e) { console.error(e); }
+  } catch(e) { document.getElementById('main-screen').innerHTML = '<div class="empty-state">网络连接失败，请检查网络后刷新</div>'; }
 }
 
 function renderPage() {

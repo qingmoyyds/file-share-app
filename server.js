@@ -6,57 +6,86 @@ const fs = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const morgan = require('morgan');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const DATA_DIR = path.join(__dirname, 'data');
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Frontend origin for CORS
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
-const FRONTEND_ORIGIN = ALLOWED_ORIGINS[0];
 
-// Ensure directories exist
+const ALLOWED_FILE_EXTS = new Set([
+  '.zip', '.rar', '.7z', '.tar', '.gz', '.xz',
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+  '.mp4', '.mov', '.avi', '.mkv', '.webm',
+  '.mp3', '.wav', '.flac', '.aac',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.json', '.xml', '.csv',
+  '.psd', '.ai', '.aep', '.prproj', '.mogrt',
+  '.jsx', '.jsxbin', '.exe', '.msi'
+]);
+
 [UPLOADS_DIR, DATA_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// Local JSON-based storage
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const CONTENT_FILE = path.join(DATA_DIR, 'content.json');
 
-function readJSON(filepath, fallback = {}) {
-  try { return JSON.parse(fs.readFileSync(filepath, 'utf8')); }
+// --- Mutex for concurrent JSON file access ---
+class Mutex {
+  constructor() { this._locked = false; this._queue = []; }
+  lock() {
+    return new Promise(resolve => {
+      if (!this._locked) { this._locked = true; return resolve(); }
+      this._queue.push(resolve);
+    });
+  }
+  unlock() {
+    if (this._queue.length > 0) { this._queue.shift()(); }
+    else { this._locked = false; }
+  }
+}
+const userMutex = new Mutex();
+const contentMutex = new Mutex();
+
+async function readJSON(filepath, fallback = {}) {
+  try { return JSON.parse(await fs.promises.readFile(filepath, 'utf8')); }
   catch { return fallback; }
 }
 
-function writeJSON(filepath, data) {
-  fs.writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf8');
+async function writeJSON(filepath, data) {
+  const tmp = filepath + '.tmp';
+  await fs.promises.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
+  await fs.promises.rename(tmp, filepath);
 }
 
-// Seed default admin if no users exist
-function ensureDefaultAdmin() {
-  const users = readJSON(USERS_FILE, {});
-  if (Object.keys(users).length === 0) {
-    const hash = bcrypt.hashSync('admin123', 10);
-    users.admin = { password: hash, role: 'admin' };
-    writeJSON(USERS_FILE, users);
-    console.log('Default admin account created: admin / admin123');
-    console.log('CHANGE THIS PASSWORD IMMEDIATELY');
-  }
+// --- Seed default admin ---
+async function ensureDefaultAdmin() {
+  await userMutex.lock();
+  try {
+    const users = await readJSON(USERS_FILE, {});
+    if (Object.keys(users).length === 0) {
+      users.admin = { password: bcrypt.hashSync('admin123', 10), role: 'admin' };
+      await writeJSON(USERS_FILE, users);
+      console.log('Default admin: admin / admin123 — CHANGE IMMEDIATELY');
+    }
+  } finally { userMutex.unlock(); }
 }
 ensureDefaultAdmin();
 
-// Path traversal guard
+// --- Path traversal guard ---
 function safePath(baseDir, name) {
-  const resolved = path.resolve(baseDir, name);
-  if (!resolved.startsWith(path.resolve(baseDir) + path.sep)) {
-    return null;
-  }
+  const normalized = path.normalize(name);
+  const resolved = path.resolve(baseDir, normalized);
+  if (!resolved.startsWith(path.resolve(baseDir) + path.sep)) return null;
   return resolved;
 }
 
-// Multer storage config
+// --- Multer ---
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
@@ -64,50 +93,85 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${safeName}`);
   }
 });
-const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
 
-// CORS with whitelist
+function fileFilter(req, file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ALLOWED_FILE_EXTS.has(ext)) return cb(null, true);
+  cb(new Error(`不支持的文件类型: ${ext}`));
+}
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 500 * 1024 * 1024 },
+  fileFilter
+});
+
+// --- Helmet ---
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+// --- Morgan ---
+app.use(morgan(isProduction ? 'combined' : 'dev'));
+
+// --- CORS ---
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
     res.header('Access-Control-Allow-Origin', origin || ALLOWED_ORIGINS[0]);
   }
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-// Trust proxy
-app.set('trust proxy', 1);
+// --- CSRF check for state-changing requests ---
+function csrfCheck(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const origin = req.headers.origin;
+  if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*'))) return next();
+  if (!origin && !isProduction) return next();
+  res.status(403).json({ error: '请求被拒绝' });
+}
+app.use('/api', csrfCheck);
 
-// Middleware
-app.use(express.json());
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 app.use(session({
   secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
     httpOnly: true
   }
 }));
 
-// Rate limit for login
+// --- Rate limiters ---
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: '登录尝试过于频繁，请15分钟后再试' },
   standardHeaders: true,
   legacyHeaders: false
 });
 
-// Auth middleware
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  message: { error: '请求过于频繁' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// --- Auth middleware ---
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   next();
@@ -119,19 +183,32 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+// --- Helpers ---
+function sanitizeError(err) {
+  if (isProduction) return '服务器内部错误';
+  return err.message || '未知错误';
+}
 
-// --- Auth Routes ---
-app.post('/api/login', loginLimiter, (req, res) => {
+function loginDelay(res, status, body) {
+  const ms = 800 + Math.floor(Math.random() * 1200);
+  return new Promise(resolve => {
+    setTimeout(() => { res.status(status).json(body); resolve(); }, ms);
+  });
+}
+
+// --- Routes ---
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+// --- Auth ---
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: '用户名和密码不能为空' });
   }
-  const users = readJSON(USERS_FILE);
+  const users = await readJSON(USERS_FILE);
   const user = users[username];
   if (!user || !bcrypt.compareSync(password, user.password)) {
-    return res.status(401).json({ error: '用户名或密码错误' });
+    return await loginDelay(res, 401, { error: '用户名或密码错误' });
   }
   req.session.user = { username, role: user.role };
   res.json({ ok: true, role: user.role, username });
@@ -146,81 +223,94 @@ app.get('/api/session', (req, res) => {
   res.json({ loggedIn: true, ...req.session.user });
 });
 
-// --- User Management (Admin Only) ---
-app.get('/api/users', requireAdmin, (req, res) => {
-  const users = readJSON(USERS_FILE);
-  const list = Object.entries(users).map(([username, u]) => ({
-    username, role: u.role
-  }));
+// --- User Management ---
+app.get('/api/users', requireAdmin, async (req, res) => {
+  const users = await readJSON(USERS_FILE);
+  const list = Object.entries(users).map(([username, u]) => ({ username, role: u.role }));
   res.json(list);
 });
 
-app.post('/api/users', requireAdmin, (req, res) => {
+app.post('/api/users', requireAdmin, async (req, res) => {
   const { username, password, role } = req.body;
   if (!username || !password) return res.status(400).json({ error: '用户名和密码不能为空' });
   if (!/^[a-zA-Z0-9_]{2,20}$/.test(username)) return res.status(400).json({ error: '用户名需 2-20 位，仅限字母数字下划线' });
-  if (password.length < 3) return res.status(400).json({ error: '密码至少 3 位' });
+  if (password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
 
-  const users = readJSON(USERS_FILE);
-  if (users[username]) return res.status(409).json({ error: '用户名已存在' });
-
-  users[username] = { password: bcrypt.hashSync(password, 10), role: role || 'user' };
-  writeJSON(USERS_FILE, users);
-  res.json({ ok: true });
+  await userMutex.lock();
+  try {
+    const users = await readJSON(USERS_FILE);
+    if (users[username]) return res.status(409).json({ error: '用户名已存在' });
+    users[username] = { password: bcrypt.hashSync(password, 10), role: role || 'user' };
+    await writeJSON(USERS_FILE, users);
+    res.json({ ok: true });
+  } finally { userMutex.unlock(); }
 });
 
-app.delete('/api/users/:username', requireAdmin, (req, res) => {
+app.delete('/api/users/:username', requireAdmin, async (req, res) => {
   if (req.params.username === req.session.user.username) {
     return res.status(400).json({ error: '不能删除自己' });
   }
-  const users = readJSON(USERS_FILE);
-  if (!users[req.params.username]) return res.status(404).json({ error: '用户不存在' });
-  delete users[req.params.username];
-  writeJSON(USERS_FILE, users);
-  res.json({ ok: true });
+
+  await userMutex.lock();
+  try {
+    const users = await readJSON(USERS_FILE);
+    if (!users[req.params.username]) return res.status(404).json({ error: '用户不存在' });
+    if (users[req.params.username].role === 'admin') {
+      const adminCount = Object.values(users).filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) return res.status(400).json({ error: '不能删除最后一个管理员' });
+    }
+    delete users[req.params.username];
+    await writeJSON(USERS_FILE, users);
+    res.json({ ok: true });
+  } finally { userMutex.unlock(); }
 });
 
-app.put('/api/users/:username/password', requireAdmin, (req, res) => {
+app.put('/api/users/:username/password', requireAdmin, async (req, res) => {
   const { password } = req.body;
-  if (!password || password.length < 3) return res.status(400).json({ error: '密码至少 3 位' });
+  if (!password || password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
 
-  const users = readJSON(USERS_FILE);
-  if (!users[req.params.username]) return res.status(404).json({ error: '用户不存在' });
-
-  users[req.params.username].password = bcrypt.hashSync(password, 10);
-  writeJSON(USERS_FILE, users);
-  res.json({ ok: true });
+  await userMutex.lock();
+  try {
+    const users = await readJSON(USERS_FILE);
+    if (!users[req.params.username]) return res.status(404).json({ error: '用户不存在' });
+    users[req.params.username].password = bcrypt.hashSync(password, 10);
+    await writeJSON(USERS_FILE, users);
+    res.json({ ok: true });
+  } finally { userMutex.unlock(); }
 });
 
-app.put('/api/password', requireAuth, (req, res) => {
+app.put('/api/password', requireAuth, async (req, res) => {
   const { oldPassword, newPassword } = req.body;
-  if (!newPassword || newPassword.length < 3) return res.status(400).json({ error: '新密码至少 3 位' });
+  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
 
-  const users = readJSON(USERS_FILE);
-  const user = users[req.session.user.username];
-  if (!user) return res.status(404).json({ error: '用户不存在' });
-  if (!bcrypt.compareSync(oldPassword, user.password)) return res.status(403).json({ error: '原密码错误' });
-
-  users[req.session.user.username].password = bcrypt.hashSync(newPassword, 10);
-  writeJSON(USERS_FILE, users);
-  res.json({ ok: true });
+  await userMutex.lock();
+  try {
+    const users = await readJSON(USERS_FILE);
+    const user = users[req.session.user.username];
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    if (!bcrypt.compareSync(oldPassword, user.password)) return res.status(403).json({ error: '原密码错误' });
+    users[req.session.user.username].password = bcrypt.hashSync(newPassword, 10);
+    await writeJSON(USERS_FILE, users);
+    res.json({ ok: true });
+  } finally { userMutex.unlock(); }
 });
 
-// --- File Routes ---
-
-// List files
-app.get('/api/files', requireAuth, (req, res) => {
-  const files = fs.readdirSync(UPLOADS_DIR).map(name => {
-    const stat = fs.statSync(path.join(UPLOADS_DIR, name));
-    const match = name.match(/^\d+-(.+)$/);
-    const originalName = match ? match[1] : name;
-    return { name, originalName, size: stat.size, uploadedAt: stat.mtime };
-  });
-  files.sort((a, b) => b.uploadedAt - a.uploadedAt);
-  res.json(files);
+// --- Files ---
+app.get('/api/files', requireAuth, async (req, res) => {
+  try {
+    const names = await fs.promises.readdir(UPLOADS_DIR);
+    const stats = await Promise.all(names.map(async name => {
+      const stat = await fs.promises.stat(path.join(UPLOADS_DIR, name));
+      const match = name.match(/^\d+-(.+)$/);
+      return { name, originalName: match ? match[1] : name, size: stat.size, uploadedAt: stat.mtime };
+    }));
+    stats.sort((a, b) => b.uploadedAt - a.uploadedAt);
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: '读取文件列表失败' });
+  }
 });
 
-// Download file
 app.get('/api/files/:name', requireAuth, (req, res) => {
   const filePath = safePath(UPLOADS_DIR, req.params.name);
   if (!filePath || !fs.existsSync(filePath)) {
@@ -231,13 +321,17 @@ app.get('/api/files/:name', requireAuth, (req, res) => {
   res.download(filePath, downloadName);
 });
 
-// Upload file (admin only)
-app.post('/api/files', requireAdmin, upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: '未选择文件' });
-  res.json({ ok: true, name: req.file.filename, originalName: req.file.originalname });
+app.post('/api/files', requireAdmin, (req, res, next) => {
+  upload.single('file')(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: '文件不能超过 500MB' });
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) return res.status(400).json({ error: '未选择文件' });
+    res.json({ ok: true, name: req.file.filename, originalName: req.file.originalname });
+  });
 });
 
-// Delete file (admin only)
 app.delete('/api/files/:name', requireAdmin, (req, res) => {
   const filePath = safePath(UPLOADS_DIR, req.params.name);
   if (!filePath || !fs.existsSync(filePath)) {
@@ -247,18 +341,31 @@ app.delete('/api/files/:name', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Content (Public read, Admin write) ---
-app.get('/api/content', (req, res) => {
-  const content = readJSON(CONTENT_FILE, {});
+// --- Content ---
+app.get('/api/content', async (req, res) => {
+  const content = await readJSON(CONTENT_FILE, {});
   res.json(content);
 });
 
-app.put('/api/content', requireAdmin, (req, res) => {
+app.put('/api/content', requireAdmin, async (req, res) => {
   const payload = { ...req.body };
   delete payload._id;
   delete payload.key;
-  writeJSON(CONTENT_FILE, payload);
-  res.json({ ok: true });
+
+  await contentMutex.lock();
+  try {
+    await writeJSON(CONTENT_FILE, payload);
+    res.json({ ok: true });
+  } finally { contentMutex.unlock(); }
+});
+
+// --- Global error handler ---
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: '请求体过大' });
+  }
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: sanitizeError(err) });
 });
 
 app.listen(PORT, () => {

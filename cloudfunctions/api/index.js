@@ -6,17 +6,32 @@ const cloudbase = require('@cloudbase/node-sdk');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const morgan = require('morgan');
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const isProduction = process.env.NODE_ENV === 'production';
+
+const ALLOWED_FILE_EXTS = new Set([
+  '.zip', '.rar', '.7z', '.tar', '.gz', '.xz',
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+  '.mp4', '.mov', '.avi', '.mkv', '.webm',
+  '.mp3', '.wav', '.flac', '.aac',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.json', '.xml', '.csv',
+  '.psd', '.ai', '.aep', '.prproj', '.mogrt',
+  '.jsx', '.jsxbin', '.exe', '.msi'
+]);
+
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
 
 const tcb = cloudbase.init({});
 const db = tcb.database();
+const _ = db.command;
+
 const FILES_COLLECTION = 'files';
 const USERS_COLLECTION = 'users';
 const CONTENT_COLLECTION = 'content';
-
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',').map(s => s.trim());
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
@@ -29,25 +44,46 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Verify password, handling both bcrypt and legacy plaintext
 function verifyPassword(input, stored) {
-  if (stored.startsWith('$2a$') || stored.startsWith('$2b$')) {
+  if (stored.startsWith('$2a$') || stored.startsWith('$2b$') || stored.startsWith('$2y$')) {
     return bcrypt.compareSync(input, stored);
   }
   return input === stored;
 }
 
-// CORS with whitelist
+function sanitizeError(err) {
+  if (isProduction) return '服务器内部错误';
+  return err.message || '未知错误';
+}
+
+// --- Helmet ---
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// --- Morgan → console.log for CloudBase ---
+app.use(morgan('combined', {
+  stream: { write: msg => console.log(msg.trimEnd()) }
+}));
+
+// --- CORS ---
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
     res.header('Access-Control-Allow-Origin', origin || ALLOWED_ORIGINS[0]);
   }
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
+});
+
+// --- CSRF check ---
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  const origin = req.headers.origin;
+  if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*'))) return next();
+  if (!origin && !isProduction) return next();
+  res.status(403).json({ error: '请求被拒绝' });
 });
 
 app.set('trust proxy', 1);
@@ -58,19 +94,32 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
     httpOnly: true
   }
 }));
 
-// Rate limit for login
+// --- Rate limiters ---
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: '登录尝试过于频繁，请15分钟后再试' },
   standardHeaders: true,
   legacyHeaders: false
+});
+
+// --- File filter for multer ---
+function fileFilter(req, file, cb) {
+  const ext = require('path').extname(file.originalname).toLowerCase();
+  if (ALLOWED_FILE_EXTS.has(ext)) return cb(null, true);
+  cb(new Error(`不支持的文件类型: ${ext}`));
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter
 });
 
 // --- Auth ---
@@ -81,17 +130,13 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       return res.status(400).json({ error: '用户名和密码不能为空' });
     }
     const { data } = await db.collection(USERS_COLLECTION).where({ username }).limit(1).get();
-    if (!data || data.length === 0) {
+    if (!data || data.length === 0 || !verifyPassword(password, data[0].password)) {
+      await new Promise(r => setTimeout(r, 800 + Math.floor(Math.random() * 1200)));
       return res.status(401).json({ error: '用户名或密码错误' });
     }
     const user = data[0];
 
-    if (!verifyPassword(password, user.password)) {
-      return res.status(401).json({ error: '用户名或密码错误' });
-    }
-
-    // Upgrade plaintext password to bcrypt
-    if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
+    if (!user.password.startsWith('$2')) {
       const hash = bcrypt.hashSync(password, 10);
       await db.collection(USERS_COLLECTION).doc(user._id).update({ password: hash });
     }
@@ -99,7 +144,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     req.session.user = { username, role: user.role };
     res.json({ ok: true, role: user.role, username });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -112,17 +157,22 @@ app.get('/api/session', (req, res) => {
   res.json({ loggedIn: true, ...req.session.user });
 });
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', async (req, res) => {
+  try {
+    await db.collection(USERS_COLLECTION).limit(1).get();
+    res.json({ status: 'ok' });
+  } catch {
+    res.json({ status: 'ok', db: 'unreachable' });
+  }
+});
 
-// --- User Management (Admin Only) ---
-
+// --- User Management ---
 app.get('/api/users', requireAdmin, async (req, res) => {
   try {
     const { data } = await db.collection(USERS_COLLECTION).orderBy('username', 'asc').get();
-    const users = (data || []).map(u => ({ username: u.username, role: u.role, _id: u._id }));
-    res.json(users);
+    res.json((data || []).map(u => ({ username: u.username, role: u.role, _id: u._id })));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -131,16 +181,19 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     const { username, password, role } = req.body;
     if (!username || !password) return res.status(400).json({ error: '用户名和密码不能为空' });
     if (!/^[a-zA-Z0-9_]{2,20}$/.test(username)) return res.status(400).json({ error: '用户名需 2-20 位，仅限字母数字下划线' });
-    if (password.length < 3) return res.status(400).json({ error: '密码至少 3 位' });
+    if (password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
 
     const { data: existing } = await db.collection(USERS_COLLECTION).where({ username }).limit(1).get();
     if (existing && existing.length > 0) return res.status(409).json({ error: '用户名已存在' });
 
-    const hash = bcrypt.hashSync(password, 10);
-    await db.collection(USERS_COLLECTION).add({ username, password: hash, role: role || 'user' });
+    await db.collection(USERS_COLLECTION).add({
+      username,
+      password: bcrypt.hashSync(password, 10),
+      role: role || 'user'
+    });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -151,43 +204,45 @@ app.delete('/api/users/:username', requireAdmin, async (req, res) => {
     }
     const { data } = await db.collection(USERS_COLLECTION).where({ username: req.params.username }).limit(1).get();
     if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
+    if (data[0].role === 'admin') {
+      const { data: admins } = await db.collection(USERS_COLLECTION).where({ role: 'admin' }).get();
+      if ((admins || []).length <= 1) return res.status(400).json({ error: '不能删除最后一个管理员' });
+    }
     await db.collection(USERS_COLLECTION).doc(data[0]._id).remove();
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
 app.put('/api/users/:username/password', requireAdmin, async (req, res) => {
   try {
     const { password } = req.body;
-    if (!password || password.length < 3) return res.status(400).json({ error: '密码至少 3 位' });
+    if (!password || password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
 
     const { data } = await db.collection(USERS_COLLECTION).where({ username: req.params.username }).limit(1).get();
     if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
 
-    const hash = bcrypt.hashSync(password, 10);
-    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: hash });
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: bcrypt.hashSync(password, 10) });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
 app.put('/api/password', requireAuth, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
-    if (!newPassword || newPassword.length < 3) return res.status(400).json({ error: '新密码至少 3 位' });
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
 
     const { data } = await db.collection(USERS_COLLECTION).where({ username: req.session.user.username }).limit(1).get();
     if (!data || data.length === 0) return res.status(404).json({ error: '用户不存在' });
     if (!verifyPassword(oldPassword, data[0].password)) return res.status(403).json({ error: '原密码错误' });
 
-    const hash = bcrypt.hashSync(newPassword, 10);
-    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: hash });
+    await db.collection(USERS_COLLECTION).doc(data[0]._id).update({ password: bcrypt.hashSync(newPassword, 10) });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -200,62 +255,75 @@ app.get('/api/files', requireAuth, async (req, res) => {
       .get();
     res.json(result.data || []);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
-app.post('/api/files', requireAdmin, upload.single('file'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: '未选择文件' });
-  try {
-    const safeName = `${Date.now()}-${encodeURIComponent(req.file.originalname)}`;
-    const uploadResult = await tcb.uploadFile({ cloudPath: safeName, fileContent: req.file.buffer });
-    await db.collection(FILES_COLLECTION).add({
-      name: safeName,
-      fileId: uploadResult.fileID,
-      originalName: req.file.originalname,
-      size: req.file.size,
-      uploadedAt: new Date().toISOString()
-    });
-    res.json({ ok: true, name: safeName, originalName: req.file.originalname });
-  } catch (err) {
-    res.status(500).json({ error: '上传失败: ' + err.message });
-  }
+app.post('/api/files', requireAdmin, (req, res, next) => {
+  upload.single('file')(req, res, async err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: '文件不能超过 10MB' });
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) return res.status(400).json({ error: '未选择文件' });
+    try {
+      const safeName = `${Date.now()}-${encodeURIComponent(req.file.originalname)}`;
+      const uploadResult = await tcb.uploadFile({ cloudPath: safeName, fileContent: req.file.buffer });
+      await db.collection(FILES_COLLECTION).add({
+        name: safeName,
+        fileId: uploadResult.fileID,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        uploadedAt: new Date().toISOString()
+      });
+      res.json({ ok: true, name: safeName, originalName: req.file.originalname });
+    } catch (e) {
+      res.status(500).json({ error: sanitizeError(e) });
+    }
+  });
 });
 
 app.get('/api/files/:name', requireAuth, async (req, res) => {
   try {
     const docs = await db.collection(FILES_COLLECTION).where({ name: req.params.name }).get();
     if (!docs.data || docs.data.length === 0) return res.status(404).json({ error: '文件不存在' });
-    const fileRecord = docs.data[0];
-    const fileId = fileRecord.fileId || req.params.name;
-    const result = await tcb.downloadFile({ fileID: fileId });
-    const originalName = fileRecord.originalName || decodeURIComponent(req.params.name.replace(/^\d+-/, ''));
+    const rec = docs.data[0];
+    if (!rec.fileId) return res.status(404).json({ error: '文件ID无效' });
+    const result = await tcb.downloadFile({ fileID: rec.fileId });
+    const originalName = rec.originalName || decodeURIComponent(req.params.name.replace(/^\d+-/, ''));
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.send(Buffer.from(result.fileContent));
   } catch (err) {
-    res.status(404).json({ error: '文件不存在: ' + err.message });
+    res.status(404).json({ error: '文件不存在' });
   }
 });
 
 app.delete('/api/files/:name', requireAdmin, async (req, res) => {
   try {
     const docs = await db.collection(FILES_COLLECTION).where({ name: req.params.name }).get();
-    let fileId = req.params.name;
+    const ids = [];
     if (docs.data && docs.data.length > 0) {
-      fileId = docs.data[0].fileId || req.params.name;
+      for (const doc of docs.data) {
+        if (doc.fileId) ids.push(doc.fileId);
+      }
     }
-    await tcb.deleteFile({ fileList: [fileId] });
-    for (const doc of docs.data || []) {
+    // Delete from cloud storage first
+    if (ids.length > 0) {
+      try { await tcb.deleteFile({ fileList: ids }); }
+      catch (e) { console.error('Cloud storage delete error:', e.message); }
+    }
+    // Then delete DB records
+    for (const doc of (docs.data || [])) {
       await db.collection(FILES_COLLECTION).doc(doc._id).remove();
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: '删除失败: ' + err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
-// --- Content (Public read, Admin write) ---
+// --- Content ---
 app.get('/api/content', async (req, res) => {
   try {
     const { data } = await db.collection(CONTENT_COLLECTION).where({ key: 'site' }).limit(1).get();
@@ -280,8 +348,17 @@ app.put('/api/content', requireAdmin, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
+});
+
+// --- Global error handler ---
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: '请求体过大' });
+  }
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: sanitizeError(err) });
 });
 
 exports.main = serverless(app);

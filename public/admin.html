@@ -121,6 +121,9 @@ function toast(msg, type='ok') {
 async function login() {
   const u = document.getElementById('admUser').value.trim();
   const p = document.getElementById('admPass').value;
+  const btn = document.querySelector('#loginBox button');
+  btn.textContent = '登录中...';
+  btn.disabled = true;
   try {
     const r = await fetch(API+'/api/login', { ...creds, method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u,password:p}) });
     const d = await r.json();
@@ -128,10 +131,11 @@ async function login() {
     if (d.role !== 'admin') { document.getElementById('loginErr').textContent = '仅管理员可登录'; return; }
     document.getElementById('loginBox').style.display = 'none';
     document.getElementById('editor').style.display = 'block';
-    document.getElementById('navRight').innerHTML = `<span style="color:#888;font-size:13px">${d.username}</span><button onclick="logout()">退出</button>`;
+    document.getElementById('navRight').innerHTML = `<span style="color:#888;font-size:13px">${esc(d.username)}</span><button onclick="logout()">退出</button>`;
     await loadContent();
     renderAll();
   } catch(e) { document.getElementById('loginErr').textContent = '登录失败'; }
+  finally { btn.textContent = '登 录'; btn.disabled = false; }
 }
 
 async function logout() {
@@ -252,9 +256,15 @@ function collectData() {
   }
 }
 
+let saving = false;
 async function saveAll() {
+  if (saving) return;
   collectData();
-  // Clean internal fields before sending
+  const btn = document.querySelector('.btn-save');
+  const orig = btn.textContent;
+  btn.textContent = '保存中...';
+  btn.disabled = true;
+  saving = true;
   const payload = { ...content };
   delete payload._id;
   delete payload.key;
@@ -262,8 +272,9 @@ async function saveAll() {
     const r = await fetch(API+'/api/content', { ...creds, method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const d = await r.json();
     if (!r.ok) { toast('保存失败: ' + (d.error || r.status), 'err'); return; }
-    toast('✅ 保存成功！前台已更新');
-  } catch(e) { toast('保存失败: 网络错误', 'err'); }
+    toast('保存成功! 前台已更新');
+  } catch(e) { toast('保存失败: 网络错误, 请重试', 'err'); }
+  finally { btn.textContent = orig; btn.disabled = false; saving = false; }
 }
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
